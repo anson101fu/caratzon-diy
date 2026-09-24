@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CARATZON.COM DIY - 尊貴高貴版</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body { 
+            background-color: #faf9f6; 
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-weight: 300; 
+            -webkit-font-smoothing: antialiased;
+            color: #2c2c2c;
+            overflow-x: hidden;
+        }
+        
+        .canvas-container { 
+            position: relative; 
+            width: 300px; 
+            height: 300px; 
+            margin: 0 auto; 
+            background: radial-gradient(circle, #ffffff 0%, #f4f1ea 100%); 
+            border-radius: 50%; 
+            box-shadow: inset 0 0 30px rgba(197, 160, 89, 0.08), 0 10px 30px rgba(0,0,0,0.03);
+            border: 1px solid #e6dfd1;
+            touch-action: none; 
+        }
+        
+        @media (min-width: 768px) {
+            .canvas-container { width: 340px; height: 340px; }
+        }
+        
+        .item-node { 
+            position: absolute; 
+            transform: translate(-50%, -50%); 
+            cursor: grab;
+            transition: transform 0.15s ease-out, box-shadow 0.15s ease-out; 
+            z-index: 10; 
+            border-radius: 50%;
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .item-node.dragging { 
+            transition: none !important; 
+            cursor: grabbing !important; 
+            transform: translate(-50%, -50%) scale(1.22) !important;
+            box-shadow: 0 14px 30px rgba(0,0,0,0.3) !important;
+            z-index: 999 !important;
+        }
+        .item-node:hover:not(.dragging) { transform: translate(-50%, -50%) scale(1.12); z-index: 20; }
+        
+        /* 核心優化：平時隱藏 ✕ 刪除按鈕，避免畫面密集難睇；Hover/按住時先浮現 */
+        .del-badge {
+            position: absolute; top: -3px; right: -3px; width: 18px; height: 18px;
+            background-color: #2c2c2c; color: white; border-radius: 50%; font-size: 10px;
+            font-weight: 400; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; z-index: 30;
+            border: 1px solid #fff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            transform: scale(0.8);
+        }
+        .item-node:hover .del-badge, .item-node.dragging .del-badge {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+        }
+        .del-badge:hover { background-color: #d97706; }
+
+        .bracelet-string {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border: 1.5px solid #c5a059; border-radius: 50%; pointer-events: none; z-index: 1;
+            transition: border-color 0.4s ease, width 0.3s ease, height 0.3s ease;
+            opacity: 0.85;
+        }
+
+        .preview-3d-stage {
+            width: 300px; height: 300px;
+            margin: 0 auto;
+            position: relative;
+            background: radial-gradient(circle, #ffffff 0%, #f1ecdf 100%);
+            border-radius: 50%;
+            border: 1px solid #c5a059;
+            box-shadow: inset 0 0 30px rgba(197, 160, 89, 0.12), 0 10px 30px rgba(0,0,0,0.04);
+            overflow: hidden;
+            cursor: grab;
+            touch-action: none;
+            perspective: 1000px;
+        }
+        .preview-3d-stage:active { cursor: grabbing; }
+
+        @media (min-width: 768px) {
+            .preview-3d-stage { width: 340px; height: 340px; }
+        }
+
+        .wrist-model-bg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 130px; height: 210px;
+            background: linear-gradient(135deg, #ebdccd 0%, #c4ab93 100%);
+            border-radius: 65px; opacity: 0.45; filter: blur(1px);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            z-index: 2; pointer-events: none;
+        }
+
+        .bead-3d-node {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: transform 0.05s ease-out;
+        }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #dcd6cd; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c5a059; }
+
+        .bead-img-box {
+            width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            clip-path: circle(50% at 50% 50%); background: #ffffff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        
+        .bead-img-box img.gem-img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+            transform: scale(2.5); 
+        }
+
+        .match-card-double {
+            border: 1.5px solid #c5a059 !important;
+            box-shadow: 0 6px 20px rgba(197, 160, 89, 0.12) !important;
+            background: linear-gradient(180deg, #fffcf5 0%, #ffffff 100%) !important;
+        }
+        .match-card-zodiac {
+            border: 1px solid #d4af37 !important;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.08) !important;
+            background: #ffffff !important;
+        }
+        .match-card-bazi {
+            border: 1px solid #b45309 !important;
+            box-shadow: 0 4px 15px rgba(180, 83, 9, 0.08) !important;
+            background: #ffffff !important;
+        }
+        .match-card-goal {
+            border: 1px solid #e6dfd1 !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) !important;
+            background: #ffffff !important;
+        }
+        
+        .text-gold-gradient {
+            background: linear-gradient(135deg, #b8860b 0%, #daa520 50%, #ffd700 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .lang-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 500;
+            background-color: #ffffff;
+            color: #8c8275;
+            border: 1px solid #e6dfd1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .lang-btn.active {
+            background-color: #2c2c2c;
+            color: #ffffff;
+            border-color: #2c2c2c;
+        }
+    </style>
+</head>
+<body class="p-2 md:p-6">
+    <div class="max-w-6xl mx-auto bg-white shadow-[0_20px_50px_rgba(197,160,89,0.08)] border border-[#e6dfd1] rounded-[2rem] overflow-hidden my-2">
+        
+        <!-- Header -->
+        <div class="p-4 md:px-10 border-b border-[#f0ebe1] bg-white/90 backdrop-blur-md sticky top-0 z-50">
+            <div class="flex flex-col gap-3">
+                <div class="flex justify-between items-center w-full">
+                    <div>
+                        <h1 class="text-xl md:text-3xl font-bold tracking-[0.18em] text-[#2c2c2c]">CARATZON.COM</h1>
+                        <p class="text-[10px] md:text-[11px] text-[#8c8275] font-light tracking-[0.2em] uppercase mt-0.5" id="ui-subtitle">Bespoke Jewelry Designer</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="user-display-desk" class="text-xs text-[#665c52] hidden md:inline">訪客</span>
+                        <button onclick="openAuthModal()" id="btn-auth" class="text-xs px-4 py-2 rounded-full bg-[#2c2c2c] text-white font-light tracking-wide hover:bg-[#c5a059] transition cursor-pointer shadow-sm">
+                            登入 / 註冊
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center w-full pt-2 border-t border-[#f0ebe1]/60">
+                    <span class="text-[10px] text-[#8c8275] font-light tracking-wider uppercase">Select Language</span>
+                    <div class="flex gap-1 bg-[#f4f1ea] p-1 rounded-full border border-[#e6dfd1]">
+                        <button onclick="setLanguage('zh')" id="lang-zh" class="lang-btn active">繁</button>
+                        <button onclick="setLanguage('zh_cn')" id="lang-zh_cn" class="lang-btn">简</button>
+                        <button onclick="setLanguage('en')" id="lang-en" class="lang-btn">EN</button>
+                        <button onclick="setLanguage('ru')" id="lang-ru" class="lang-btn">RU</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 min-h-[650px]">
+            
+            <!-- 👈 左欄 -->
+            <div class="md:col-span-5 bg-[#fcfbf9] p-5 md:p-8 border-b md:border-b-0 md:border-r border-[#f0ebe1] flex flex-col justify-between">
+                <div>
+                    <div class="mb-4 flex items-center justify-between bg-white border border-[#e6dfd1] py-3 px-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-medium text-[#595045] tracking-wide" id="ui-target-label">目標手圍</span>
+                            <select id="target-wrist" onchange="updateCanvas()" class="text-xs font-medium bg-[#faf9f6] border border-[#e6dfd1] rounded-lg p-1.5 cursor-pointer text-[#2c2c2c] focus:outline-none focus:border-[#c5a059] transition">
+                                <option value="140" id="opt-14">14 cm</option>
+                                <option value="150" selected id="opt-15">15 cm</option>
+                                <option value="160" id="opt-16">16 cm</option>
+                                <option value="170" id="opt-17">17 cm</option>
+                                <option value="180" id="opt-18">18 cm</option>
+                            </select>
+                        </div>
+                        <div id="wrist-status" class="text-[10px] font-medium tracking-wide text-[#b45309] bg-[#fffbeb] px-2.5 py-1.5 rounded-md border border-[#fde68a]">
+                            建議追加珠子
+                        </div>
+                    </div>
+
+                    <!-- 模式切換掣 -->
+                    <div class="flex bg-[#f4f1ea] p-1 rounded-xl mb-4 border border-[#e6dfd1]">
+                        <button onclick="switchViewMode('2d')" id="mode-2d" class="flex-1 py-1.5 text-[11px] font-medium rounded-lg bg-white text-[#2c2c2c] shadow-sm transition cursor-pointer">2D 排版設計</button>
+                        <button onclick="switchViewMode('3d')" id="mode-3d" class="flex-1 py-1.5 text-[11px] font-medium rounded-lg text-[#8c8275] hover:text-[#2c2c2c] transition cursor-pointer">3D 實物佩戴模擬</button>
+                    </div>
+
+                    <!-- 畫布區域容器 -->
+                    <div class="my-4" id="canvas-wrapper"></div>
+                    
+                    <div id="energy-breakdown-box" class="mt-6 p-4 bg-white border border-[#e6dfd1] rounded-2xl shadow-sm text-center hidden transition-all">
+                        <p class="text-[10px] font-medium text-[#8c8275] tracking-widest uppercase mb-2" id="lbl-energy-title">Energy Profile</p>
+                        <div id="energy-bars" class="flex flex-wrap justify-center gap-2 text-[10px]"></div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-8 flex flex-col items-center justify-center gap-4">
+                    <div class="flex justify-between items-end w-full px-5 py-4 bg-white rounded-2xl border border-[#e6dfd1] shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
+                        <div class="text-left">
+                            <p class="text-[10px] text-[#8c8275] font-light tracking-widest uppercase mb-1" id="ui-total-label">Total</p>
+                            <p class="text-xs text-[#595045] font-medium" id="total-info">0 粒珠 | 0 mm</p>
+                        </div>
+                        <p class="text-2xl font-light text-[#2c2c2c] tracking-tight" id="total-price">HK$0.00</p>
+                    </div>
+
+                    <div class="flex items-center gap-4 bg-white border border-[#e6dfd1] px-5 py-3 rounded-full shadow-sm w-full justify-center">
+                        <span class="text-[11px] text-[#595045] font-medium tracking-wide" id="ui-string-label">手繩顏色</span>
+                        <input type="color" id="string-color" value="#c5a059" onchange="updateStringColor(this.value)" class="w-5 h-5 rounded-full cursor-pointer border-0 p-0 bg-transparent">
+                        
+                        <div class="flex gap-2 border-l border-[#f0ebe1] pl-4">
+                            <button onclick="updateStringColor('#c5a059')" class="w-3.5 h-3.5 rounded-full bg-[#c5a059] border border-[#e6dfd1] hover:scale-110 transition"></button>
+                            <button onclick="updateStringColor('#2c2c2c')" class="w-3.5 h-3.5 rounded-full bg-[#2c2c2c] border border-[#e6dfd1] hover:scale-110 transition"></button>
+                            <button onclick="updateStringColor('#e6dfd1')" class="w-3.5 h-3.5 rounded-full bg-[#e6dfd1] border border-[#e6dfd1] hover:scale-110 transition"></button>
+                            <button onclick="updateStringColor('#a39888')" class="w-3.5 h-3.5 rounded-full bg-[#a39888] border border-[#e6dfd1] hover:scale-110 transition"></button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 w-full mt-2">
+                        <button onclick="saveDesignToSupabase()" id="btn-save" class="flex-1 text-[11px] bg-[#2c2c2c] hover:bg-[#c5a059] text-white shadow-md py-3 rounded-full transition-all duration-300 font-light tracking-widest uppercase cursor-pointer">
+                            保存設計
+                        </button>
+                        <div onclick="clearBracelet()" class="text-[11px] text-[#595045] bg-white border border-[#e6dfd1] shadow-sm px-6 py-3 rounded-full cursor-pointer hover:bg-[#faf9f6] hover:text-[#2c2c2c] transition-all font-light tracking-widest uppercase flex items-center" id="btn-reset">重新開始</div>
+                    </div>
+                    <p class="text-[10px] text-[#8c8275] font-light tracking-wide mt-2" id="ui-tip">按住珠子拖曳可重新排序，點擊珠子浮現 ✕ 移除</p>
+                </div>
+            </div>
+
+            <!-- 👉 右欄：命理分析 + 寶石庫 -->
+            <div class="md:col-span-7 p-5 md:p-8 bg-white flex flex-col justify-between">
+                <div>
+                    <!-- 🔮 專屬命理卡片 -->
+                    <div id="user-fortune-card" class="mb-6">
+                        <div id="fortune-box" class="bg-gradient-to-br from-[#2c2c2c] via-[#3a3530] to-[#242424] p-6 rounded-3xl text-white shadow-xl border border-[#c5a059]/30 relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-36 h-36 bg-[#c5a059]/10 rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <div class="flex justify-between items-center mb-3 relative z-10">
+                                <span class="text-xs font-light tracking-[0.2em] text-[#e6dfd1] uppercase" id="fortune-title">Astrology Profile</span>
+                                <div class="flex gap-2">
+                                    <button onclick="generateAutoBracelet()" id="btn-auto-gen" class="text-[10px] bg-[#c5a059] text-white hover:bg-[#b08d46] px-3.5 py-1.5 rounded-full font-medium transition cursor-pointer shadow-sm tracking-wide">
+                                        自動配搭
+                                    </button>
+                                    <button onclick="openBirthInputModal()" id="btn-edit-birth" class="text-[10px] border border-white/30 text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full font-light transition cursor-pointer tracking-wide">
+                                        設定生辰
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-[11px] font-light leading-relaxed text-[#e6dfd1]/90 relative z-10" id="fortune-desc">
+                                設定生辰日期，系統將運用五行與星座演算法，為您精算出專屬的開運水晶組合。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 🗂️ 分類標籤 -->
+                    <div class="flex gap-3 mb-5">
+                        <button onclick="setCategoryFilter('gem')" id="cat-gem" class="flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-[#2c2c2c] text-white shadow-md transition-all duration-300">寶石 Gemstones</button>
+                        <button onclick="setCategoryFilter('accessory')" id="cat-accessory" class="flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-white border border-[#e6dfd1] text-[#665c52] hover:bg-[#faf9f6] transition-all duration-300">配件 Accessories</button>
+                    </div>
+
+                    <!-- 🎯 願望過濾選單 -->
+                    <div id="goal-filter-container" class="mb-5 pb-4 border-b border-[#f0ebe1]">
+                        <p class="text-[10px] font-medium text-[#8c8275] tracking-widest uppercase mb-3" id="lbl-goal-title">Curated Collections</p>
+                        <div class="flex flex-wrap gap-2 text-[11px]">
+                            <button onclick="setGoalFilter('all')" id="goal-all" class="px-4 py-2 rounded-full border font-light tracking-wide bg-[#2c2c2c] text-white shadow-sm transition-all duration-300">所有系列</button>
+                            <button onclick="setGoalFilter('wealth')" id="goal-wealth" class="px-4 py-2 rounded-full border border-[#e6dfd1] bg-white text-[#665c52] hover:bg-[#faf9f6] hover:text-[#2c2c2c] font-light tracking-wide transition-all duration-300">事業招財</button>
+                            <button onclick="setGoalFilter('love')" id="goal-love" class="px-4 py-2 rounded-full border border-[#e6dfd1] bg-white text-[#665c52] hover:bg-[#faf9f6] hover:text-[#2c2c2c] font-light tracking-wide transition-all duration-300">桃花人緣</button>
+                            <button onclick="setGoalFilter('protection')" id="goal-protection" class="px-4 py-2 rounded-full border border-[#e6dfd1] bg-white text-[#665c52] hover:bg-[#faf9f6] hover:text-[#2c2c2c] font-light tracking-wide transition-all duration-300">護身辟邪</button>
+                            <button onclick="setGoalFilter('peace')" id="goal-peace" class="px-4 py-2 rounded-full border border-[#e6dfd1] bg-white text-[#665c52] hover:bg-[#faf9f6] hover:text-[#2c2c2c] font-light tracking-wide transition-all duration-300">靜心安神</button>
+                        </div>
+                    </div>
+
+                    <div class="pb-3 flex justify-between items-center">
+                        <span class="text-xs font-medium tracking-wide text-[#2c2c2c]" id="ui-bead-title">寶石庫 (Gemstone Library)</span>
+                        <span class="text-[10px] text-[#8c8275] font-light tracking-wide" id="ui-rank-tip">A級數越高，晶體越剔透</span>
+                    </div>
+
+                    <div id="list-container" class="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[520px] pr-2 pb-10"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 生日 Modal -->
+    <div id="birth-modal" style="display: none;" class="fixed inset-0 bg-[#2c2c2c]/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-3xl p-8 w-84 shadow-2xl relative border border-[#e6dfd1]">
+            <button onclick="closeBirthInputModal()" class="absolute top-4 right-4 text-[#8c8275] hover:text-[#2c2c2c] text-xl font-light cursor-pointer transition">✕</button>
+            <h2 class="text-lg font-light tracking-widest text-[#2c2c2c] mb-1 text-center" id="birth-modal-title">生辰設定</h2>
+            <p class="text-[11px] text-[#8c8275] font-light text-center mb-6 tracking-wide" id="birth-modal-sub">請選擇出生年月日及時辰</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] text-[#665c52] block mb-1.5 font-medium tracking-widest uppercase" id="lbl-birthdate">出生年月日</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <select id="direct-year" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                        <select id="direct-month" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                        <select id="direct-day" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-[10px] text-[#665c52] block mb-1.5 font-medium tracking-widest uppercase" id="lbl-gender">性別</label>
+                    <select id="direct-gender" class="w-full text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition">
+                        <option value="none" selected id="opt-gender-none">不選擇 (預設)</option>
+                        <option value="male" id="opt-gender-male">男士 (型格沉穩風格)</option>
+                        <option value="female" id="opt-gender-female">女士 (溫婉女性化風格)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[10px] text-[#665c52] block mb-1.5 font-medium tracking-widest uppercase" id="lbl-birthtime">出生時間</label>
+                    <select id="direct-birthtime" class="w-full text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition">
+                        <option value="unknown" selected id="opt-time-unknown">不清楚 (按月份推算)</option>
+                        <option value="1">01:00-03:00 丑時</option>
+                        <option value="3">03:00-05:00 寅時 (木旺)</option>
+                        <option value="5">05:00-07:00 卯時 (木旺)</option>
+                        <option value="7">07:00-09:00 辰時</option>
+                        <option value="9">09:00-11:00 巳時 (火旺)</option>
+                        <option value="12">11:00-13:00 午時 (火旺)</option>
+                        <option value="13">13:00-15:00 未時</option>
+                        <option value="15">15:00-17:00 申時 (金旺)</option>
+                        <option value="17">17:00-19:00 酉時 (金旺)</option>
+                        <option value="19">19:00-21:00 戌時</option>
+                        <option value="21">21:00-23:00 亥時 (水旺)</option>
+                        <option value="23">23:00-01:00 子時 (水旺)</option>
+                    </select>
+                </div>
+
+                <button onclick="applyDirectBirth()" id="btn-calc-submit" class="w-full text-[11px] tracking-widest uppercase py-3.5 bg-[#2c2c2c] text-white rounded-xl font-light hover:bg-[#c5a059] transition-all cursor-pointer mt-4 shadow-md">
+                    開始精算
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 會員 Modal -->
+    <div id="auth-modal" style="display: none;" class="fixed inset-0 bg-[#2c2c2c]/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-3xl p-8 w-88 shadow-2xl relative border border-[#e6dfd1] max-h-[90vh] overflow-y-auto">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-[#8c8275] hover:text-[#2c2c2c] text-xl font-light cursor-pointer transition">✕</button>
+            <h2 class="text-lg font-light tracking-widest text-[#2c2c2c] mb-1 text-center" id="auth-modal-title">會員認證</h2>
+            <p class="text-[11px] text-[#8c8275] font-light text-center mb-6 tracking-wide" id="auth-modal-sub">登入以儲存您的專屬珠寶設計</p>
+
+            <div class="space-y-4">
+                <input type="email" id="auth-email" placeholder="Email Address" class="w-full text-xs p-3 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] focus:outline-none focus:border-[#c5a059] focus:bg-white transition">
+                <input type="password" id="auth-password" placeholder="Password" class="w-full text-xs p-3 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] focus:outline-none focus:border-[#c5a059] focus:bg-white transition">
+                
+                <div class="pt-4 border-t border-[#f0ebe1] mt-2">
+                    <p class="text-[10px] font-medium text-[#665c52] tracking-widest uppercase mb-3" id="lbl-reg-birth">Registration Details</p>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <select id="auth-year" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                                <select id="auth-month" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                                <select id="auth-day" class="text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition"></select>
+                            </div>
+                        </div>
+                        <div>
+                            <select id="auth-birthtime" class="w-full text-xs p-2.5 border border-[#e6dfd1] rounded-xl bg-[#faf9f6] text-[#2c2c2c] outline-none focus:border-[#c5a059] transition">
+                                <option value="unknown" selected>不清楚時辰 (按月份推算)</option>
+                                <option value="1">01:00-03:00 丑時</option>
+                                <option value="3">03:00-05:00 寅時</option>
+                                <option value="5">05:00-07:00 卯時</option>
+                                <option value="7">07:00-09:00 辰時</option>
+                                <option value="9">09:00-11:00 巳時</option>
+                                <option value="12">11:00-13:00 午時</option>
+                                <option value="13">13:00-15:00 未時</option>
+                                <option value="15">15:00-17:00 申時</option>
+                                <option value="17">17:00-19:00 酉時</option>
+                                <option value="19">19:00-21:00 戌時</option>
+                                <option value="21">21:00-23:00 亥時</option>
+                                <option value="23">23:00-01:00 子時</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button onclick="handleLogin()" id="btn-login" class="flex-1 text-[11px] tracking-widest uppercase py-3 border border-[#2c2c2c] bg-white text-[#2c2c2c] hover:bg-[#faf9f6] rounded-xl font-medium transition cursor-pointer">Login</button>
+                    <button onclick="saveDesignToSupabase()" id="btn-signup" class="flex-1 text-[11px] tracking-widest uppercase py-3 bg-[#2c2c2c] text-white rounded-xl font-light hover:bg-[#c5a059] transition cursor-pointer shadow-md">Register</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLang = 'zh';
+        let storedBirthData = null;
+        let activeGoalFilter = 'all';
+        let activeCategoryFilter = 'gem';
+        let userGender = 'none';
+        let currentViewMode = '2d';
+        let rotationAngle3D = 0;
+
+        const EXCHANGE_RATES = {
+            zh: { prefix: 'HK$', rate: 1.10 },
+            zh_cn: { prefix: '¥', rate: 1.0 },
+            en: { prefix: '$', rate: 0.14 },
+            ru: { prefix: '₽', rate: 13.0 }
+        };
+
+        const TRANSLATIONS = {
+            zh: {
+                subtitle: 'Bespoke Jewelry Designer', targetLabel: '目標手圍', stringLabel: '手繩顏色', btnSave: '保存設計', btnReset: '重新開始', tip: '按住珠子拖曳可重新排序，點擊珠子浮現 ✕ 移除', beadTitle: '寶石庫 (Gemstone Library)', rankTip: 'A級數越高，晶體越剔透', beadUnit: '件', statusStart: '請開始挑選寶石', statusNeedMore: '尚未填滿 (尚欠約 {n} 粒 {s}mm)', statusTooLong: '長度偏長 (建議移除部分)', statusPerfect: '完美符合手圍', opt14: '14 cm', opt15: '15 cm', opt16: '16 cm', opt17: '17 cm', opt18: '18 cm',
+                fortuneTitle: 'Astrology Profile', editBirth: '設定生辰', btnAutoGen: '自動配搭', fortuneDefault: '設定生辰日期，系統將運用五行與星座演算法，為您精算出專屬的開運水晶組合。',
+                badgeDouble: '命理絕配', badgeZodiac: '星座對應', badgeBazi: '五行補運', badgeGoal: '意圖契合',
+                lblEnergyTitle: 'Energy Profile',
+                lblGoalTitle: 'Curated Collections',
+                btnGoalAll: '所有系列', btnGoalWealth: '事業招財', btnGoalLove: '桃花人緣', btnGoalProtection: '護身辟邪', btnGoalPeace: '靜心安神',
+                birthModalTitle: '生辰設定', birthModalSub: '請選擇出生年月日及時辰', 
+                lblBirthDate: '出生年月日', 
+                lblGender: '性別', 
+                optGenderNone: '不選擇 (預設)', 
+                optGenderMale: '男士 (型格沉穩風格)', 
+                optGenderFemale: '女士 (溫婉女性化風格)',
+                lblBirthTime: '出生時間', 
+                optUnknown: '不清楚 (按月份推算)', 
+                btnCalcSubmit: '開始精算',
+                authModalTitle: '會員認證', authModalSub: '登入以儲存您的專屬珠寶設計', lblRegBirth: 'Registration Details', btnLogin: 'Login', btnSignUp: 'Register',
+                catGem: '寶石 Gemstones', catAcc: '配件 Accessories', btnAddAcc: '加入配件 (Add)',
+                uiTotal: 'Total', guestText: '訪客', authBtn: '登入 / 註冊',
+                mode2D: '2D 排版設計', mode3D: '3D 實物佩戴模擬'
+            },
+            zh_cn: {
+                subtitle: 'Bespoke Jewelry Designer', targetLabel: '目标手围', stringLabel: '手绳颜色', btnSave: '保存设计', btnReset: '重新开始', tip: '按住珠子拖拽可重新排序，点击珠子浮现 ✕ 移除', beadTitle: '宝石库 (Gemstone Library)', rankTip: 'A级数越高，晶体越剔透', beadUnit: '件', statusStart: '请开始挑选宝石', statusNeedMore: '尚未填满 (尚欠约 {n} 粒 {s}mm)', statusTooLong: '长度偏长 (建议移除部分)', statusPerfect: '完美符合手围', opt14: '14 cm', opt15: '15 cm', opt16: '16 cm', opt17: '17 cm', opt18: '18 cm',
+                fortuneTitle: 'Astrology Profile', editBirth: '设定生辰', btnAutoGen: '自动搭配', fortuneDefault: '设定生辰日期，系统将运用五行与星座算法，为您精算出专属的开运水晶组合。',
+                badgeDouble: '命理绝配', badgeZodiac: '星座对应', badgeBazi: '五行补运', badgeGoal: '意图契合',
+                lblEnergyTitle: 'Energy Profile',
+                lblGoalTitle: 'Curated Collections',
+                btnGoalAll: '所有系列', btnGoalWealth: '事业招财', btnGoalLove: '桃花人缘', btnGoalProtection: '护身辟邪', btnGoalPeace: '静心安神',
+                birthModalTitle: '生辰设定', birthModalSub: '请选择出生年月日及时辰', 
+                lblBirthDate: '出生年月日', 
+                lblGender: '性别', 
+                optGenderNone: '不选择 (默认)', 
+                optGenderMale: '男士 (型格沉稳风格)', 
+                optGenderFemale: '女士 (温婉女性化风格)',
+                lblBirthTime: '出生时间', 
+                optUnknown: '不清楚 (按月份推算)', 
+                btnCalcSubmit: '开始精算',
+                authModalTitle: '会员认证', authModalSub: '登录以储存您的专属珠宝设计', lblRegBirth: 'Registration Details', btnLogin: 'Login', btnSignUp: 'Register',
+                catGem: '宝石 Gemstones', catAcc: '配件 Accessories', btnAddAcc: '加入配件 (Add)',
+                uiTotal: 'Total', guestText: '访客', authBtn: '登录 / 注册',
+                mode2D: '2D 排版设计', mode3D: '3D 实物佩戴模拟'
+            },
+            en: {
+                subtitle: 'Bespoke Jewelry Designer', targetLabel: 'Target Wrist', stringLabel: 'String Color', btnSave: 'Save Design', btnReset: 'Reset', tip: 'Hold & drag beads to reorder, hover to reveal ✕', beadTitle: 'Gemstone Library', rankTip: 'Higher A grade = Better clarity', beadUnit: 'pcs', statusStart: 'Select gemstones', statusNeedMore: 'Need approx. {n} more {s}mm', statusTooLong: 'Too long (Remove some)', statusPerfect: 'Perfect Fit', opt14: '14 cm', opt15: '15 cm', opt16: '16 cm', opt17: '17 cm', opt18: '18 cm',
+                fortuneTitle: 'Astrology Profile', editBirth: 'Set Birth Info', btnAutoGen: 'Auto-Match', fortuneDefault: 'Set your birth details, and our algorithm will curate the perfect gemstone combination based on Bazi and Zodiac principles.',
+                badgeDouble: 'Perfect Match', badgeZodiac: 'Zodiac Pick', badgeBazi: 'Element Match', badgeGoal: 'Curated for Goal',
+                lblEnergyTitle: 'Energy Profile',
+                lblGoalTitle: 'Curated Collections',
+                btnGoalAll: 'All Collections', btnGoalWealth: 'Career & Wealth', btnGoalLove: 'Love & Charm', btnGoalProtection: 'Protection', btnGoalPeace: 'Peace & Calm',
+                birthModalTitle: 'Birth Details', birthModalSub: 'Please enter your birth date and time', 
+                lblBirthDate: 'Date of Birth', 
+                lblGender: 'Gender (Optional)', 
+                optGenderNone: 'Not Specified (Default)', 
+                optGenderMale: 'Male (Bold & Grounded Style)', 
+                optGenderFemale: 'Female (Soft & Feminine Style)',
+                lblBirthTime: 'Time (Optional)', 
+                optUnknown: 'Unknown (Calculate by month)', 
+                btnCalcSubmit: 'Calculate Profile',
+                authModalTitle: 'Authentication', authModalSub: 'Login to save your bespoke designs', lblRegBirth: 'Registration Details', btnLogin: 'Login', btnSignUp: 'Register',
+                catGem: 'Gemstones', catAcc: 'Accessories', btnAddAcc: 'Add Item',
+                uiTotal: 'Total', guestText: 'Guest', authBtn: 'Login / Register',
+                mode2D: '2D Designer', mode3D: '3D Wrist Try-on'
+            },
+            ru: {
+                subtitle: 'Bespoke Jewelry Designer', targetLabel: 'Размер:', stringLabel: 'Цвет нити:', btnSave: 'Сохранить', btnReset: 'Сбросить', tip: 'Удерживайте для перемещения, наведите для ✕', beadTitle: 'Библиотека драгоценных камней', rankTip: 'Больше A = Выше чистота', beadUnit: 'шт.', statusStart: 'Выберите камни', statusNeedMore: 'Нужно еще ~{n} шт. ({s}мм)', statusTooLong: 'Слишком длинно', statusPerfect: 'Идеальный размер', opt14: '14 см', opt15: '15 см', opt16: '16 см', opt17: '17 см', opt18: '18 см',
+                fortuneTitle: 'Астрологический профиль', editBirth: 'Ввести дату', btnAutoGen: 'Авто-подбор', fortuneDefault: 'Укажите дату рождения, и наш алгоритм подберет идеальную комбинацию камней на основе Бацзы и Зодиака.',
+                badgeDouble: 'Идеальное совпадение', badgeZodiac: 'Выбор Зодиака', badgeBazi: 'Элемент Бацзы', badgeGoal: 'Выбор по цели',
+                lblEnergyTitle: 'Профиль энергии',
+                lblGoalTitle: 'Коллекции',
+                btnGoalAll: 'Все', btnGoalWealth: 'Богатство', btnGoalLove: 'Любовь', btnGoalProtection: 'Защита', btnGoalPeace: 'Спокойствие',
+                birthModalTitle: 'Данные рождения', birthModalSub: 'Укажите дату и время рождения', 
+                lblBirthDate: 'Дата рождения', 
+                lblGender: 'Пол (опционально)', 
+                optGenderNone: 'Не указано', 
+                optGenderMale: 'Мужской (строгий стиль)', 
+                optGenderFemale: 'Женский (нежный стиль)',
+                lblBirthTime: 'Время (опционально)', 
+                optUnknown: 'Неизвестно (расчет по месяцу)', 
+                btnCalcSubmit: 'Рассчитать профиль',
+                authModalTitle: 'Аутентификация', authModalSub: 'Войдите для сохранения дизайна', lblRegBirth: 'Данные регистрации', btnLogin: 'Войти', btnSignUp: 'Регистрация',
+                catGem: 'Камни', catAcc: 'Фурнитура', btnAddAcc: 'Добавить',
+                uiTotal: 'Total', guestText: 'Гость', authBtn: 'Вход',
+                mode2D: '2D Дизайн', mode3D: '3D Примерка'
+            }
+        };
+
+        const ZODIAC_NAMES = {
+            aries: { zh: '白羊座', zh_cn: '白羊座', en: 'Aries', ru: 'Овен' }, taurus: { zh: '金牛座', zh_cn: '金牛座', en: 'Taurus', ru: 'Телец' },
+            gemini: { zh: '雙子座', zh_cn: '双子座', en: 'Gemini', ru: 'Близнецы' }, cancer: { zh: '巨蟹座', zh_cn: '巨蟹座', en: 'Cancer', ru: 'Рак' },
+            leo: { zh: '獅子座', zh_cn: '狮子座', en: 'Leo', ru: 'Лев' }, virgo: { zh: '處女座', zh_cn: '处女座', en: 'Virgo', ru: 'Дева' },
+            libra: { zh: '天秤座', zh_cn: '天秤座', en: 'Libra', ru: 'Весы' }, scorpio: { zh: '天蠍座', zh_cn: '天蝎座', en: 'Scorpio', ru: 'Скорпион' },
+            sagittarius: { zh: '射手座', zh_cn: '射手座', en: 'Sagittarius', ru: 'Strelec' }, capricorn: { zh: '摩羯座', zh_cn: '摩羯座', en: 'Capricorn', ru: 'Козерог' },
+            aquarius: { zh: '水瓶座', zh_cn: '水瓶座', en: 'Aquarius', ru: 'Водолей' }, pisces: { zh: '雙魚座', zh_cn: '双鱼座', en: 'Pisces', ru: 'Рыбы' }
+        };
+
+        const BEADS = [
+            // --- 配件區 Accessories ---
+            { category: 'accessory', id: 'acc-silver-sweetheart', name: { zh: '10mm 鍍古銀甜心隔珠', zh_cn: '10mm 镀古银甜心隔珠', en: '10mm Antique Silver Heart Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀甜心隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['love'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 2.2 },
+            { category: 'accessory', id: 'acc-silver-cloud', name: { zh: '10mm 鍍古銀祥雲圖騰隔珠', zh_cn: '10mm 镀古银祥云图腾隔珠', en: '10mm Antique Silver Cloud Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀祥雲圖騰隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['peace', 'protection'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 1.8 },
+            { category: 'accessory', id: 'acc-silver-fine-petal', name: { zh: '10mm 鍍古銀細瓣花隔珠', zh_cn: '10mm 镀古银细瓣花隔珠', en: '10mm Antique Silver Fine Petal Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀細瓣花隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['love', 'peace'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 2.1 },
+            { category: 'accessory', id: 'acc-silver-petal', name: { zh: '10mm 鍍古銀瓣花隔珠', zh_cn: '10mm 镀古银瓣花隔珠', en: '10mm Antique Silver Petal Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀瓣花隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['love', 'peace'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 2.1 },
+            { category: 'accessory', id: 'acc-silver-diamond', name: { zh: '10mm 鍍古銀菱紋隔珠', zh_cn: '10mm 镀古银菱纹隔珠', en: '10mm Antique Silver Diamond Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀菱紋隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['wealth', 'protection'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 1.8 },
+            { category: 'accessory', id: 'acc-silver-hollow', name: { zh: '10mm 鍍古銀鏤空花隔珠', zh_cn: '10mm 镀古银镂空花隔珠', en: '10mm Antique Silver Hollow Flower Spacer', ru: '10mm Серебряная бусина' }, img: 'images/10mm鍍古銀鏤空花隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['peace', 'love'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 10, prices: { zh: 6, zh_cn: 6 }, scale: 1.8 },
+            { category: 'accessory', id: 'acc-silver-plum', name: { zh: '12mm 鍍古銀梅英隔珠', zh_cn: '12mm 镀古银梅英隔珠', en: '12mm Antique Silver Plum Blossom Spacer', ru: '12mm Серебряная бусина' }, img: 'images/12mm鍍古銀梅英隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['peace', 'protection'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 12, prices: { zh: 8, zh_cn: 8 }, scale: 1.9 },
+            { category: 'accessory', id: 'acc-silver-shield', name: { zh: '12mm 鍍古銀永生花盾牌隔珠', zh_cn: '12mm 镀古银永生花盾牌隔珠', en: '12mm Antique Silver Shield Spacer', ru: '12mm Серебряная бусина' }, img: 'images/12mm鍍古銀永生花盾牌隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['protection'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 12, prices: { zh: 8, zh_cn: 8 }, scale: 1.7 },
+            { category: 'accessory', id: 'acc-silver-3d', name: { zh: '12mm 鍍古銀立體花隔珠', zh_cn: '12mm 镀古银立体花隔珠', en: '12mm Antique Silver 3D Flower Spacer', ru: '12mm Серебряная бусина' }, img: 'images/12mm鍍古銀立體花隔珠單個.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['wealth', 'love'], benefit: { zh: '復古銀飾、提升手鍊層次感', zh_cn: '复古银饰、提升手链层次感', en: 'Vintage silver detail for styling', ru: 'Винтажная серебряная деталь' }, zodiac: [], size: 12, prices: { zh: 8, zh_cn: 8 }, scale: 1.7 },
+
+            // --- 寶石區 Gemstones ---
+            { category: 'gem', id: 'apatite', name: { zh: '藍磷灰石', zh_cn: '蓝磷灰石', en: 'Apatite', ru: 'Апатит' }, img: 'images/藍磷灰石.jpg', element: 'water', elementName: { zh: '水 Water', zh_cn: '水 Water', en: 'Water', ru: 'Вода' }, goals: ['peace', 'wealth'], benefit: { zh: '啟發思想、順暢溝通與靈性聚焦', zh_cn: '启发思想、顺畅沟通与灵性聚焦', en: 'Inspires thought & communication', ru: 'Улучшает мышление' }, zodiac: ['gemini', 'libra'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 8, p10: 12, p12: 16 }, zh_cn: { p8: 8, p10: 12, p12: 16 } }, '3A': { zh: { p8: 14, p10: 20, p12: 28 }, zh_cn: { p8: 14, p10: 20, p12: 28 } }, '5A': { zh: { p8: 25, p10: 38, p12: 52 }, zh_cn: { p8: 25, p10: 38, p12: 52 } } } },
+            { category: 'gem', id: 'herkimer-diamond', name: { zh: '閃靈鑽', zh_cn: '闪灵钻', en: 'Herkimer Diamond', ru: 'Геркимерский алмаз' }, img: 'images/閃靈鑽.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['protection', 'peace'], benefit: { zh: '極致淨化、高頻率能量防護', zh_cn: '极致净化、高频率能量防护', en: 'High vibration purification & protection', ru: 'Высоковибрационная очистка' }, zodiac: ['aries', 'leo'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 12, p10: 18, p12: 25 }, zh_cn: { p8: 12, p10: 18, p12: 25 } }, '3A': { zh: { p8: 22, p10: 32, p12: 45 }, zh_cn: { p8: 22, p10: 32, p12: 45 } }, '5A': { zh: { p8: 40, p10: 58, p12: 78 }, zh_cn: { p8: 40, p10: 58, p12: 78 } } } },
+            { category: 'gem', id: 'sugilite', name: { zh: '舒俱來', zh_cn: '舒俱来', en: 'Sugilite', ru: 'Сугилит' }, img: 'images/舒俱來.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['protection', 'peace'], benefit: { zh: '千禧之石、強力排濁與靈性昇華', zh_cn: '千禧之石、强力排浊与灵性升华', en: 'Ultimate spiritual protection & healing', ru: 'Мощная духовная защита' }, zodiac: ['virgo', 'scorpio'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 25, p10: 38, p12: 52 }, zh_cn: { p8: 25, p10: 38, p12: 52 } }, '3A': { zh: { p8: 48, p10: 72, p12: 98 }, zh_cn: { p8: 48, p10: 72, p12: 98 } }, '5A': { zh: { p8: 98, p10: 148, p12: 198 }, zh_cn: { p8: 98, p10: 148, p12: 198 } } } },
+            { category: 'gem', id: 'obsidian', name: { zh: '黑曜石', zh_cn: '黑曜石', en: 'Obsidian', ru: 'Обсидиан' }, img: 'images/黑曜石.jpg', element: 'water', elementName: { zh: '水 Water', zh_cn: '水 Water', en: 'Water', ru: 'Вода' }, goals: ['protection'], benefit: { zh: '強效辟邪防小人、極致護身', zh_cn: '强效辟邪防小人、极致护身', en: 'Strong protection & wards off negativity', ru: 'Защита от негатива' }, zodiac: ['scorpio', 'capricorn', 'sagittarius'], styleTag: 'male', selectedRank: '3A', ranks: { 'A': { zh: { p8: 6, p10: 9, p12: 13 }, zh_cn: { p8: 6, p10: 9, p12: 13 } }, '3A': { zh: { p8: 10, p10: 15, p12: 22 }, zh_cn: { p8: 10, p10: 15, p12: 22 } }, '5A': { zh: { p8: 18, p10: 25, p12: 35 }, zh_cn: { p8: 18, p10: 25, p12: 35 } } } },
+            { category: 'gem', id: 'hypersthene', name: { zh: '金運石', zh_cn: '金运石', en: 'Hypersthene', ru: 'Гиперстен' }, img: 'images/金運石.jpg', element: 'water', elementName: { zh: '水/土 Water/Earth', zh_cn: '水/土 Water/Earth', en: 'Water/Earth', ru: 'Вода' }, goals: ['wealth', 'protection'], benefit: { zh: '極強招財吸金、保平安', zh_cn: '极强招财吸金、保平安', en: 'Attracts wealth luck & intuition', ru: 'Магнит для денег' }, zodiac: ['scorpio', 'capricorn', 'aries'], styleTag: 'male', selectedRank: '3A', ranks: { 'A': { zh: { p8: 8, p10: 12, p12: 16 }, zh_cn: { p8: 8, p10: 12, p12: 16 } }, '3A': { zh: { p8: 14, p10: 20, p12: 28 }, zh_cn: { p8: 14, p10: 20, p12: 28 } }, '5A': { zh: { p8: 24, p10: 35, p12: 48 }, zh_cn: { p8: 24, p10: 35, p12: 48 } } } },
+            { category: 'gem', id: 'smoky-quartz', name: { zh: '茶水晶', zh_cn: '茶水晶', en: 'Smoky Quartz', ru: 'Раухтопаз' }, img: 'images/茶水晶.jpg', element: 'earth', elementName: { zh: '土 Earth', zh_cn: '土 Earth', en: 'Earth', ru: 'Земля' }, goals: ['peace', 'protection'], benefit: { zh: '接地氣穩定氣場、沉澱浮躁', zh_cn: '接地气稳定气场、沉淀浮躁', en: 'Grounding energy & stability', ru: 'Заземление' }, zodiac: ['capricorn', 'scorpio', 'virgo', 'libra'], styleTag: 'male', selectedRank: 'A', ranks: { 'A': { zh: { p8: 5, p10: 8, p12: 11 }, zh_cn: { p8: 5, p10: 8, p12: 11 } }, '3A': { zh: { p8: 9, p10: 13, p12: 18 }, zh_cn: { p8: 9, p10: 13, p12: 18 } }, '5A': { zh: { p8: 15, p10: 22, p12: 30 }, zh_cn: { p8: 15, p10: 22, p12: 30 } } } },
+            { category: 'gem', id: 'rutilated-quartz', name: { zh: '金髮晶', zh_cn: '金发晶', en: 'Rutilated Quartz', ru: 'Рутиловый кварц' }, img: 'images/金髮晶.jpg', element: 'earth', elementName: { zh: '土/金 Earth/Metal', zh_cn: '土/金 Earth/Metal', en: 'Earth/Metal', ru: 'Земля' }, goals: ['wealth'], benefit: { zh: '招正偏財、加強魄力與企業家氣場', zh_cn: '招正偏财、加强魄力与企业家气场', en: 'Attracts wealth & leadership', ru: 'Богатство и лидерство' }, zodiac: ['leo', 'aries', 'taurus', 'libra'], styleTag: 'male', selectedRank: '3A', ranks: { 'A': { zh: { p8: 12, p10: 18, p12: 25 }, zh_cn: { p8: 12, p10: 18, p12: 25 } }, '3A': { zh: { p8: 22, p10: 32, p12: 45 }, zh_cn: { p8: 22, p10: 32, p12: 45 } }, '5A': { zh: { p8: 38, p10: 55, p12: 75 }, zh_cn: { p8: 38, p10: 55, p12: 75 } } } },
+            { category: 'gem', id: 'rose-quartz', name: { zh: '粉晶', zh_cn: '粉晶', en: 'Rose Quartz', ru: 'Розовый кварц' }, img: 'images/粉晶.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['love'], benefit: { zh: '招優質桃花、增強人緣與溫婉魅力', zh_cn: '招优质桃花、增强人缘与温婉魅力', en: 'Attracts love & soft charm', ru: 'Любовь и гармония' }, zodiac: ['taurus', 'libra', 'cancer'], styleTag: 'female', selectedRank: 'A', ranks: { 'A': { zh: { p8: 5, p10: 8, p12: 11 }, zh_cn: { p8: 5, p10: 8, p12: 11 } }, '3A': { zh: { p8: 10, p10: 14, p12: 20 }, zh_cn: { p8: 10, p10: 14, p12: 20 } }, '5A': { zh: { p8: 16, p10: 24, p12: 32 }, zh_cn: { p8: 16, p10: 24, p12: 32 } } } },
+            { category: 'gem', id: 'strawberry-quartz', name: { zh: '草莓晶', zh_cn: '草莓晶', en: 'Strawberry Quartz', ru: 'Клубничный кварц' }, img: 'images/草莓晶.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['love'], benefit: { zh: '吸引愛情、提升甜美親和力', zh_cn: '吸引爱情、提升甜美亲和力', en: 'Attracts active love & sweet charm', ru: 'Привлекает любовь' }, zodiac: ['taurus', 'cancer', 'libra'], styleTag: 'female', selectedRank: '3A', ranks: { 'A': { zh: { p8: 6, p10: 10, p12: 14 }, zh_cn: { p8: 6, p10: 10, p12: 14 } }, '3A': { zh: { p8: 11, p10: 16, p12: 22 }, zh_cn: { p8: 11, p10: 16, p12: 22 } }, '5A': { zh: { p8: 20, p10: 30, p12: 42 }, zh_cn: { p8: 20, p10: 30, p12: 42 } } } },
+            { category: 'gem', id: 'moonstone', name: { zh: '月光石', zh_cn: '月光石', en: 'Moonstone', ru: 'Лунный камень' }, img: 'images/月光石.jpg', element: 'metal', elementName: { zh: '金/水 Metal/Water', zh_cn: '金/水 Metal/Water', en: 'Metal/Water', ru: 'Металл' }, goals: ['love', 'peace'], benefit: { zh: '柔和氣質性格、守護浪漫愛情', zh_cn: '柔和气质性格、守护浪漫爱情', en: 'Softens temperament & seals love', ru: 'Смягчает характер' }, zodiac: ['cancer', 'libra', 'pisces'], styleTag: 'female', selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 16, p12: 22 }, zh_cn: { p8: 10, p10: 16, p12: 22 } }, '3A': { zh: { p8: 18, p10: 28, p12: 38 }, zh_cn: { p8: 18, p10: 28, p12: 38 } }, '5A': { zh: { p8: 35, p10: 52, p12: 72 }, zh_cn: { p8: 35, p10: 52, p12: 72 } } } },
+            { category: 'gem', id: 'aquamarine', name: { zh: '海藍寶', zh_cn: '海蓝宝', en: 'Aquamarine', ru: 'Аквамарин' }, img: 'images/海藍寶.jpg', element: 'water', elementName: { zh: '水 Water', zh_cn: '水 Water', en: 'Water', ru: 'Вода' }, goals: ['protection', 'love'], benefit: { zh: '溫潤如水、增添靈動與優雅氣質', zh_cn: '温润如水、增添灵动与优雅气质', en: 'Calm water energy & elegant charm', ru: 'Элегантность и защита' }, zodiac: ['pisces', 'gemini', 'libra'], styleTag: 'female', selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 15, p12: 20 }, zh_cn: { p8: 10, p10: 15, p12: 20 } }, '3A': { zh: { p8: 17, p10: 25, p12: 35 }, zh_cn: { p8: 17, p10: 25, p12: 35 } }, '5A': { zh: { p8: 32, p10: 48, p12: 65 }, zh_cn: { p8: 32, p10: 48, p12: 65 } } } },
+            { category: 'gem', id: 'green-strawberry', name: { zh: '綠草莓晶', zh_cn: '绿草莓晶', en: 'Green Strawberry Quartz', ru: 'Зеленый клубничный кварц' }, img: 'images/綠草莓晶.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['love', 'wealth'], benefit: { zh: '提升事業人緣、增加親和力與魅力', zh_cn: '提升事业人缘、增加亲和力与魅力', en: 'Boosts networking charm & love energy', ru: 'Улучшает дружелюбность' }, zodiac: ['taurus', 'libra', 'gemini'], styleTag: 'wood', selectedRank: '3A', ranks: { 'A': { zh: { p8: 6, p10: 9, p12: 13 }, zh_cn: { p8: 6, p10: 9, p12: 13 } }, '3A': { zh: { p8: 11, p10: 15, p12: 20 }, zh_cn: { p8: 11, p10: 15, p12: 20 } }, '5A': { zh: { p8: 20, p10: 28, p12: 38 }, zh_cn: { p8: 20, p10: 28, p12: 38 } } } },
+            { category: 'gem', id: 'serpentine', name: { zh: '蛇紋石', zh_cn: '蛇纹石', en: 'Serpentine', ru: 'Серпентин' }, img: 'images/蛇紋石.jpg', element: 'wood', elementName: { zh: '木/土 Wood/Earth', zh_cn: '木/土 Wood/Earth', en: 'Wood/Earth', ru: 'Дерево' }, goals: ['peace'], benefit: { zh: '清理排毒、釋放身體積累壓力', zh_cn: '清理排毒、释放身体积累压力', en: 'Detoxifies chakra & releases tension', ru: 'Очищает от усталости' }, zodiac: ['gemini', 'scorpio'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 4, p10: 6, p12: 8 }, zh_cn: { p8: 4, p10: 6, p12: 8 } }, '3A': { zh: { p8: 7, p10: 10, p12: 13 }, zh_cn: { p8: 7, p10: 10, p12: 13 } }, '5A': { zh: { p8: 13, p10: 17, p12: 23 }, zh_cn: { p8: 13, p10: 17, p12: 23 } } } },
+            { category: 'gem', id: 'diopside', name: { zh: '沙弗萊石/透輝石', zh_cn: '沙弗莱石/透辉石', en: 'Tsavorite / Diopside', ru: 'Цаворит' }, img: 'images/沙弗萊石.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['wealth'], benefit: { zh: '狂野生命力、旺正財與增強自信', zh_cn: '狂野生命力、旺正财与增强自信', en: 'Boosts career wealth', ru: 'Помогает финансово' }, zodiac: ['virgo', 'taurus', 'capricorn'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 16, p10: 24, p12: 34 }, zh_cn: { p8: 16, p10: 24, p12: 34 } }, '3A': { zh: { p8: 30, p10: 42, p12: 60 }, zh_cn: { p8: 30, p10: 42, p12: 60 } }, '5A': { zh: { p8: 58, p10: 85, p12: 120 }, zh_cn: { p8: 58, p10: 85, p12: 120 } } } },
+            { category: 'gem', id: 'malachite', name: { zh: '孔雀石', zh_cn: '孔雀石', en: 'Malachite', ru: 'Малахит' }, img: 'images/孔雀石.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['protection'], benefit: { zh: '護身辟邪與化解負面氣場', zh_cn: '护身辟邪与化解负面气场', en: 'Strong protective energy', ru: 'Защитный камень' }, zodiac: ['scorpio', 'capricorn', 'taurus'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 15, p12: 21 }, zh_cn: { p8: 10, p10: 15, p12: 21 } }, '3A': { zh: { p8: 18, p10: 26, p12: 36 }, zh_cn: { p8: 18, p10: 26, p12: 36 } }, '5A': { zh: { p8: 32, p10: 48, p12: 65 }, zh_cn: { p8: 32, p10: 48, p12: 65 } } } },
+            { category: 'gem', id: 'green-aventurine', name: { zh: '綠東陵玉', zh_cn: '绿东陵玉', en: 'Green Aventurine', ru: 'Зеленый авантюрин' }, img: 'images/綠東陵玉.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['wealth', 'peace'], benefit: { zh: '主幸運正財與舒緩眼部壓力', zh_cn: '主幸运正财与舒缓眼部压力', en: 'Opportunity stone & wealth', ru: 'Магнит возможностей' }, zodiac: ['taurus', 'virgo'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 4, p10: 6, p12: 8 }, zh_cn: { p8: 4, p10: 6, p12: 8 } }, '3A': { zh: { p8: 7, p10: 10, p12: 13 }, zh_cn: { p8: 7, p10: 10, p12: 13 } }, '5A': { zh: { p8: 12, p10: 16, p12: 22 }, zh_cn: { p8: 12, p10: 16, p12: 22 } } } },
+            { category: 'gem', id: 'amazonite', name: { zh: '天河石', zh_cn: '天河石', en: 'Amazonite', ru: 'Амазонит' }, img: 'images/天河石.jpg', element: 'wood', elementName: { zh: '木/水 Wood/Water', zh_cn: '木/水 Wood/Water', en: 'Wood/Water', ru: 'Дерево' }, goals: ['wealth', 'peace'], benefit: { zh: '幸運翻盤之石、帶來信心', zh_cn: '幸运翻盘之石、带来信心', en: 'Stone of luck & confidence', ru: 'Камень удачи' }, zodiac: ['virgo', 'aquarius'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 7, p10: 10, p12: 13 }, zh_cn: { p8: 7, p10: 10, p12: 13 } }, '3A': { zh: { p8: 11, p10: 15, p12: 20 }, zh_cn: { p8: 11, p10: 15, p12: 20 } }, '5A': { zh: { p8: 18, p10: 26, p12: 35 }, zh_cn: { p8: 18, p10: 26, p12: 35 } } } },
+            { category: 'gem', id: 'prehnite', name: { zh: '葡萄石', zh_cn: '葡萄石', en: 'Prehnite', ru: 'Пренит' }, img: 'images/葡萄石.jpg', element: 'wood', elementName: { zh: '木/土 Wood/Earth', zh_cn: '木/土 Wood/Earth', en: 'Wood/Earth', ru: 'Дерево' }, goals: ['peace', 'wealth'], benefit: { zh: '希望之石、引導指引方向', zh_cn: '希望之石、引导指引方向', en: 'Stone of hope', ru: 'Камень надежды' }, zodiac: ['libra', 'virgo', 'sagittarius'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 7, p10: 10, p12: 14 }, zh_cn: { p8: 7, p10: 10, p12: 14 } }, '3A': { zh: { p8: 12, p10: 17, p12: 23 }, zh_cn: { p8: 12, p10: 17, p12: 23 } }, '5A': { zh: { p8: 21, p10: 30, p12: 40 }, zh_cn: { p8: 21, p10: 30, p12: 40 } } } },
+            { category: 'gem', id: 'emerald', name: { zh: '天然祖母綠', zh_cn: '天然祖母绿', en: 'Emerald', ru: 'Изумруд' }, img: 'images/天然祖母綠.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['wealth', 'love'], benefit: { zh: '綠寶石之王、象徵無盡財富', zh_cn: '绿宝石之王、象征无尽财富', en: 'King of green gems', ru: 'Король камней' }, zodiac: ['taurus', 'gemini', 'cancer'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 35, p10: 50, p12: 70 }, zh_cn: { p8: 35, p10: 50, p12: 70 } }, '3A': { zh: { p8: 62, p10: 92, p12: 128 }, zh_cn: { p8: 62, p10: 92, p12: 128 } }, '5A': { zh: { p8: 128, p10: 195, p12: 280 }, zh_cn: { p8: 128, p10: 195, p12: 280 } } } },
+            { category: 'gem', id: 'peridot', name: { zh: '橄欖石', zh_cn: '橄榄石', en: 'Peridot', ru: 'Перидот' }, img: 'images/橄欖石.jpg', element: 'wood', elementName: { zh: '木/火 Wood/Fire', zh_cn: '木/火 Wood/Fire', en: 'Wood/Fire', ru: 'Дерево' }, goals: ['wealth', 'peace'], benefit: { zh: '太陽之石、帶來光明希望', zh_cn: '太阳之石、带来光明希望', en: 'Stone of the Sun', ru: 'Солнечный камень' }, zodiac: ['leo', 'virgo', 'libra'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 13, p10: 20, p12: 28 }, zh_cn: { p8: 13, p10: 20, p12: 28 } }, '3A': { zh: { p8: 22, p10: 33, p12: 46 }, zh_cn: { p8: 22, p10: 33, p12: 46 } }, '5A': { zh: { p8: 42, p10: 62, p12: 85 }, zh_cn: { p8: 42, p10: 62, p12: 85 } } } },
+            { category: 'gem', id: 'green-garnet', name: { zh: '透輝石', zh_cn: '透辉石', en: 'Chrome Diopside', ru: 'Хромдиопсид' }, img: 'images/透輝石.jpg', element: 'wood', elementName: { zh: '木 Wood', zh_cn: '木 Wood', en: 'Wood', ru: 'Дерево' }, goals: ['wealth'], benefit: { zh: '治癒心靈、幫助事業突破', zh_cn: '治愈心灵、帮助事业突破', en: 'Deep green energy', ru: 'Зеленый камень' }, zodiac: ['scorpio', 'aries', 'capricorn'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 15, p10: 22, p12: 30 }, zh_cn: { p8: 15, p10: 22, p12: 30 } }, '3A': { zh: { p8: 26, p10: 38, p12: 50 }, zh_cn: { p8: 26, p10: 38, p12: 50 } }, '5A': { zh: { p8: 50, p10: 70, p12: 95 }, zh_cn: { p8: 50, p10: 70, p12: 95 } } } },
+            { category: 'gem', id: 'red-super-seven', name: { zh: '紅超級七', zh_cn: '红超级七', en: 'Red Super Seven', ru: 'Красный Супер 7' }, img: 'images/紅超級七.jpg', element: 'fire', elementName: { zh: '火/土 Fire/Earth', zh_cn: '火/土 Fire/Earth', en: 'Fire/Earth', ru: 'Огонь' }, goals: ['wealth', 'love'], benefit: { zh: '全方位提升運勢、專注招財', zh_cn: '全方位提升运势、专注招财', en: 'Amplifies all lucky energy', ru: 'Усиливает удачу' }, zodiac: ['all'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 20, p10: 28, p12: 40 }, zh_cn: { p8: 20, p10: 28, p12: 40 } }, '3A': { zh: { p8: 38, p10: 55, p12: 78 }, zh_cn: { p8: 38, p10: 55, p12: 78 } }, '5A': { zh: { p8: 72, p10: 108, p12: 150 }, zh_cn: { p8: 72, p10: 108, p12: 150 } } } },
+            { category: 'gem', id: 'pink-aventurine', name: { zh: '粉東陵玉', zh_cn: '粉东陵玉', en: 'Pink Aventurine', ru: 'Розовый авантюрин' }, img: 'images/粉東陵玉.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['love'], benefit: { zh: '帶來輕鬆愉快心情、增加同理心', zh_cn: '带来轻松愉快心情、增加同理心', en: 'Joyful energy', ru: 'Радость' }, zodiac: ['cancer', 'taurus'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 4, p10: 6, p12: 8 }, zh_cn: { p8: 4, p10: 6, p12: 8 } }, '3A': { zh: { p8: 8, p10: 11, p12: 15 }, zh_cn: { p8: 8, p10: 11, p12: 15 } }, '5A': { zh: { p8: 14, p10: 19, p12: 26 }, zh_cn: { p8: 14, p10: 19, p12: 26 } } } },
+            { category: 'gem', id: 'rhodonite', name: { zh: '薔薇輝石', zh_cn: '蔷薇辉石', en: 'Rhodonite', ru: 'Родонит' }, img: 'images/薔薇輝石.jpg', element: 'earth', elementName: { zh: '土/火 Earth/Fire', zh_cn: '土/火 Earth/Fire', en: 'Earth/Fire', ru: 'Земля' }, goals: ['love', 'peace'], benefit: { zh: '保持頭腦清醒、修復感情', zh_cn: '保持头脑清醒、修复感情', en: 'Resolves conflicts', ru: 'Помогает в любви' }, zodiac: ['taurus', 'gemini', 'libra'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 6, p10: 8, p12: 11 }, zh_cn: { p8: 6, p10: 8, p12: 11 } }, '3A': { zh: { p8: 10, p10: 15, p12: 20 }, zh_cn: { p8: 10, p10: 15, p12: 20 } }, '5A': { zh: { p8: 19, p10: 27, p12: 36 }, zh_cn: { p8: 19, p10: 27, p12: 36 } } } },
+            { category: 'gem', id: 'red-agate', name: { zh: '紅瑪瑙', zh_cn: '红玛瑙', en: 'Red Agate', ru: 'Красный агат' }, img: 'images/紅瑪瑙.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['peace', 'protection'], benefit: { zh: '改善氣血、帶來吉祥熱情', zh_cn: '改善气血、带来吉祥热情', en: 'Boosts vitality & passion', ru: 'Энергия жизни' }, zodiac: ['aries', 'virgo', 'leo'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 4, p10: 6, p12: 8 }, zh_cn: { p8: 4, p10: 6, p12: 8 } }, '3A': { zh: { p8: 7, p10: 10, p12: 13 }, zh_cn: { p8: 7, p10: 10, p12: 13 } }, '5A': { zh: { p8: 13, p10: 17, p12: 23 }, zh_cn: { p8: 13, p10: 17, p12: 23 } } } },
+            { category: 'gem', id: 'pink-amber', name: { zh: '粉歐泊', zh_cn: '粉欧泊', en: 'Pink Opal', ru: 'Розовый опал' }, img: 'images/粉歐泊.jpg', element: 'water', elementName: { zh: '水/火 Water/Fire', zh_cn: '水/火 Water/Fire', en: 'Water/Fire', ru: 'Вода' }, goals: ['love', 'peace'], benefit: { zh: '天使之淚、激發愛情靈感', zh_cn: '天使之泪、激发爱情灵感', en: 'Romantic inspiration', ru: 'Вдохновение' }, zodiac: ['cancer', 'libra', 'pisces'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 12, p10: 18, p12: 25 }, zh_cn: { p8: 12, p10: 18, p12: 25 } }, '3A': { zh: { p8: 21, p10: 31, p12: 42 }, zh_cn: { p8: 21, p10: 31, p12: 42 } }, '5A': { zh: { p8: 40, p10: 58, p12: 78 }, zh_cn: { p8: 40, p10: 58, p12: 78 } } } },
+            { category: 'gem', id: 'kunzite', name: { zh: '紫鋰輝石', zh_cn: '紫锂辉石', en: 'Kunzite', ru: 'Кунцит' }, img: 'images/紫鋰輝石.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['love', 'peace'], benefit: { zh: '暢通心輪、接納真愛', zh_cn: '畅通心轮、接纳真爱', en: 'Opens heart chakra', ru: 'Открывает сердце' }, zodiac: ['taurus', 'leo', 'scorpio'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 15, p10: 22, p12: 30 }, zh_cn: { p8: 15, p10: 22, p12: 30 } }, '3A': { zh: { p8: 26, p10: 38, p12: 50 }, zh_cn: { p8: 26, p10: 38, p12: 50 } }, '5A': { zh: { p8: 50, p10: 70, p12: 95 }, zh_cn: { p8: 50, p10: 70, p12: 95 } } } },
+            { category: 'gem', id: 'sunstone', name: { zh: '太陽石', zh_cn: '太阳石', en: 'Sunstone', ru: 'Солнечный камень' }, img: 'images/太陽石.jpg', element: 'fire', elementName: { zh: '火/土 Fire/Earth', zh_cn: '火/土 Fire/Earth', en: 'Fire/Earth', ru: 'Огонь' }, goals: ['wealth', 'peace'], benefit: { zh: '驅散憂鬱正能量、辟邪防小人', zh_cn: '驱散忧郁正能量、辟邪防小人', en: 'Positive solar energy', ru: 'Свет и защита' }, zodiac: ['leo', 'aries', 'sagittarius'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 8, p10: 13, p12: 18 }, zh_cn: { p8: 8, p10: 13, p12: 18 } }, '3A': { zh: { p8: 15, p10: 22, p12: 30 }, zh_cn: { p8: 15, p10: 22, p12: 30 } }, '5A': { zh: { p8: 28, p10: 40, p12: 55 }, zh_cn: { p8: 28, p10: 40, p12: 55 } } } },
+            { category: 'gem', id: 'orange-moonstone', name: { zh: '橙月光石', zh_cn: '橙月光石', en: 'Peach Moonstone', ru: 'Персиковый лунный камень' }, img: 'images/橙月光石.jpg', element: 'earth', elementName: { zh: '土/火 Earth/Fire', zh_cn: '土/火 Earth/Fire', en: 'Earth/Fire', ru: 'Земля' }, goals: ['love', 'peace'], benefit: { zh: '安撫情緒焦慮、增添溫柔', zh_cn: '安抚情绪焦虑、增添温柔', en: 'Calms anxiety', ru: 'Успокоение' }, zodiac: ['cancer', 'libra', 'pisces'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 8, p10: 11, p12: 16 }, zh_cn: { p8: 8, p10: 11, p12: 16 } }, '3A': { zh: { p8: 13, p10: 18, p12: 25 }, zh_cn: { p8: 13, p10: 18, p12: 25 } }, '5A': { zh: { p8: 22, p10: 31, p12: 42 }, zh_cn: { p8: 22, p10: 31, p12: 42 } } } },
+            { category: 'gem', id: 'red-rabbit-hair', name: { zh: '紅兔毛', zh_cn: '红兔毛', en: 'Red Rutilated Quartz', ru: 'Красный волосатик' }, img: 'images/紅兔毛.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['health', 'love'], benefit: { zh: '調理氣血與溫暖氣場', zh_cn: '调理气血与温暖气场', en: 'Boosts circulation', ru: 'Красота и энергия' }, zodiac: ['aries', 'leo', 'scorpio'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 15, p12: 20 }, zh_cn: { p8: 10, p10: 15, p12: 20 } }, '3A': { zh: { p8: 17, p10: 24, p12: 33 }, zh_cn: { p8: 17, p10: 24, p12: 33 } }, '5A': { zh: { p8: 30, p10: 42, p12: 58 }, zh_cn: { p8: 30, p10: 42, p12: 58 } } } },
+            { category: 'gem', id: 'amethyst', name: { zh: '紫水晶', zh_cn: '紫水晶', en: 'Amethyst', ru: 'Аметист' }, img: 'images/紫水晶.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['peace', 'love'], benefit: { zh: '開發靈性智慧、助眠安神', zh_cn: '开发灵性智慧、助眠安神', en: 'Wisdom & better sleep', ru: 'Мудрость' }, zodiac: ['aquarius', 'pisces', 'sagittarius', 'libra'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 6, p10: 8, p12: 11 }, zh_cn: { p8: 6, p10: 8, p12: 11 } }, '3A': { zh: { p8: 10, p10: 14, p12: 19 }, zh_cn: { p8: 10, p10: 14, p12: 19 } }, '5A': { zh: { p8: 18, p10: 25, p12: 34 }, zh_cn: { p8: 18, p10: 25, p12: 34 } } } },
+            { category: 'gem', id: 'south-red-agate', name: { zh: '南紅瑪瑙', zh_cn: '南红玛瑙', en: 'Nanhong Agate', ru: 'Наньхун Агат' }, img: 'images/南紅瑪瑙.jpg', element: 'fire', elementName: { zh: '火 Fire', zh_cn: '火 Fire', en: 'Fire', ru: 'Огонь' }, goals: ['wealth', 'peace'], benefit: { zh: '鴻運當頭、調和氣血', zh_cn: '鸿运当头、调和气血', en: 'Good luck & vitality', ru: 'Удача и здоровье' }, zodiac: ['aries', 'leo', 'scorpio', 'libra'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 15, p12: 21 }, zh_cn: { p8: 10, p10: 15, p12: 21 } }, '3A': { zh: { p8: 19, p10: 28, p12: 39 }, zh_cn: { p8: 19, p10: 28, p12: 39 } }, '5A': { zh: { p8: 35, p10: 50, p12: 70 }, zh_cn: { p8: 35, p10: 50, p12: 70 } } } },
+            { category: 'gem', id: 'larimar', name: { zh: '海紋石', zh_cn: '海纹石', en: 'Larimar', ru: 'Ларимар' }, img: 'images/海紋石.jpg', element: 'water', elementName: { zh: '水 Water', zh_cn: '水 Water', en: 'Water', ru: 'Вода' }, goals: ['peace', 'love'], benefit: { zh: '平復焦慮、順暢溝通', zh_cn: '平复焦虑、顺畅沟通', en: 'Calms anxiety & communication', ru: 'Спокойствие' }, zodiac: ['pisces', 'aquarius', 'cancer'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 15, p12: 22 }, zh_cn: { p8: 10, p10: 15, p12: 22 } }, '3A': { zh: { p8: 17, p10: 26, p12: 36 }, zh_cn: { p8: 17, p10: 26, p12: 36 } }, '5A': { zh: { p8: 30, p10: 44, p12: 60 }, zh_cn: { p8: 30, p10: 44, p12: 60 } } } },
+            { category: 'gem', id: 'citrine', name: { zh: '黃水晶', zh_cn: '黄水晶', en: 'Citrine', ru: 'Цитрин' }, img: 'images/黃水晶.jpg', element: 'earth', elementName: { zh: '土 Earth', zh_cn: '土 Earth', en: 'Earth', ru: 'Земля' }, goals: ['wealth'], benefit: { zh: '主招偏財、自信快樂能量', zh_cn: '主招偏财、自信快乐能量', en: 'Wealth & confidence', ru: 'Успех' }, zodiac: ['gemini', 'virgo', 'leo', 'libra'], selectedRank: '3A', ranks: { 'A': { zh: { p8: 10, p10: 14, p12: 20 }, zh_cn: { p8: 10, p10: 14, p12: 20 } }, '3A': { zh: { p8: 17, p10: 24, p12: 33 }, zh_cn: { p8: 17, p10: 24, p12: 33 } }, '5A': { zh: { p8: 30, p10: 42, p12: 58 }, zh_cn: { p8: 30, p10: 42, p12: 58 } } } },
+            { category: 'gem', id: 'white-quartz', name: { zh: '白水晶', zh_cn: '白水晶', en: 'Clear Quartz', ru: 'Горный хрусталь' }, img: 'images/白水晶.jpg', element: 'metal', elementName: { zh: '金 Metal', zh_cn: '金 Metal', en: 'Metal', ru: 'Металл' }, goals: ['peace', 'protection'], benefit: { zh: '淨化負能量、提升專注力', zh_cn: '净化负能量、提升专注力', en: 'Clears negative energy', ru: 'Очищение' }, zodiac: ['all', 'gemini', 'capricorn', 'pisces'], selectedRank: 'A', ranks: { 'A': { zh: { p8: 5, p10: 8, p12: 11 }, zh_cn: { p8: 5, p10: 8, p12: 11 } }, '3A': { zh: { p8: 10, p10: 13, p12: 18 }, zh_cn: { p8: 10, p10: 13, p12: 18 } }, '5A': { zh: { p8: 16, p10: 21, p12: 28 }, zh_cn: { p8: 16, p10: 21, p12: 28 } } } }
+        ];
+
+        let bracelet = [];
+        let stringColor = '#c5a059';
+        let userZodiacKey = null;
+        let userBaziElements = [];
+
+        function initDateDropdowns() {
+            const currentYear = 2026;
+            const populate = (yearId, monthId, dayId) => {
+                const yearEl = document.getElementById(yearId);
+                const monthEl = document.getElementById(monthId);
+                const dayEl = document.getElementById(dayId);
+
+                let yHtml = '';
+                for (let y = currentYear; y >= 1950; y--) {
+                    yHtml += `<option value="${y}" ${y === 1995 ? 'selected' : ''}>${y}</option>`;
+                }
+                yearEl.innerHTML = yHtml;
+
+                let mHtml = '';
+                for (let m = 1; m <= 12; m++) {
+                    mHtml += `<option value="${m}" ${m === 4 ? 'selected' : ''}>${m}</option>`;
+                }
+                monthEl.innerHTML = mHtml;
+
+                let dHtml = '';
+                for (let d = 1; d <= 31; d++) {
+                    dHtml += `<option value="${d}" ${d === 1 ? 'selected' : ''}>${d}</option>`;
+                }
+                dayEl.innerHTML = dHtml;
+            };
+
+            populate('direct-year', 'direct-month', 'direct-day');
+            populate('auth-year', 'auth-month', 'auth-day');
+        }
+
+        function setCategoryFilter(categoryKey) {
+            activeCategoryFilter = categoryKey;
+            
+            const btnGem = document.getElementById('cat-gem');
+            const btnAcc = document.getElementById('cat-accessory');
+
+            if (categoryKey === 'gem') {
+                btnGem.className = "flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-[#2c2c2c] text-white shadow-md transition-all duration-300";
+                btnAcc.className = "flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-white border border-[#e6dfd1] text-[#665c52] hover:bg-[#faf9f6] transition-all duration-300";
+                document.getElementById('goal-filter-container').style.display = 'block'; 
+            } else {
+                btnAcc.className = "flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-[#2c2c2c] text-white shadow-md transition-all duration-300";
+                btnGem.className = "flex-1 py-2.5 rounded-xl text-[12px] font-medium tracking-widest uppercase bg-white border border-[#e6dfd1] text-[#665c52] hover:bg-[#faf9f6] transition-all duration-300";
+                document.getElementById('goal-filter-container').style.display = 'none'; 
+            }
+
+            renderList();
+        }
+
+        function setGoalFilter(goalKey) {
+            activeGoalFilter = goalKey;
+            ['all', 'wealth', 'love', 'protection', 'peace'].forEach(k => {
+                const btn = document.getElementById(`goal-${k}`);
+                if (btn) {
+                    if (k === goalKey) {
+                        btn.className = "px-4 py-2 rounded-full border font-light tracking-wide bg-[#2c2c2c] text-white shadow-sm transition-all duration-300";
+                    } else {
+                        btn.className = "px-4 py-2 rounded-full border border-[#e6dfd1] bg-white text-[#665c52] hover:bg-[#faf9f6] hover:text-[#2c2c2c] font-light tracking-wide transition-all duration-300";
+                    }
+                }
+            });
+            renderList();
+        }
+
+        function generateAutoBracelet() {
+            const targetWrist = parseInt(document.getElementById('target-wrist').value) || 150;
+            const targetTotalMm = targetWrist + 25; 
+            const defaultBeadSize = 10; 
+            const beadsCount = Math.round(targetTotalMm / defaultBeadSize); 
+
+            let gemMatches = BEADS.filter(b => b.category === 'gem').map(bead => {
+                let isZodiacMatch = userZodiacKey && bead.zodiac && bead.zodiac.includes(userZodiacKey);
+                let isBaziMatch = userBaziElements.length > 0 && userBaziElements.includes(bead.element);
+                let isGoalMatch = activeGoalFilter !== 'all' && bead.goals && bead.goals.includes(activeGoalFilter);
+                
+                let score = 0;
+                if (isGoalMatch) score += 5;
+                if (isZodiacMatch && isBaziMatch) score += 3;
+                else if (isZodiacMatch) score += 2;
+                else if (isBaziMatch) score += 1;
+
+                if (userGender === 'male' && bead.styleTag === 'male') score += 4;
+                if (userGender === 'female' && bead.styleTag === 'female') score += 4;
+
+                return { ...bead, score };
+            });
+
+            gemMatches.sort((a, b) => b.score - a.score);
+
+            let chosenBeads = gemMatches.slice(0, 4);
+            if (chosenBeads.length === 0) chosenBeads = BEADS.filter(b => b.category === 'gem').slice(0, 4);
+
+            bracelet = [];
+            const langKey = (currentLang === 'zh_cn') ? 'zh_cn' : 'zh';
+            const config = EXCHANGE_RATES[currentLang] || EXCHANGE_RATES['zh'];
+
+            for (let i = 0; i < beadsCount; i++) {
+                const selectedBead = chosenBeads[i % chosenBeads.length];
+                const rank = selectedBead.selectedRank || '3A';
+                const baseVal = (selectedBead.ranks && selectedBead.ranks[rank] && (selectedBead.ranks[rank][langKey]?.p10 || selectedBead.ranks[rank]['zh']?.p10)) || 15;
+                const finalPrice = baseVal * config.rate;
+
+                bracelet.push({
+                    id: Date.now() + Math.random(),
+                    img: selectedBead.img,
+                    size: defaultBeadSize,
+                    price: finalPrice,
+                    beadId: selectedBead.id
+                });
+            }
+
+            updateCanvas();
+        }
+
+        function switchViewMode(mode) {
+            currentViewMode = mode;
+            const btn2d = document.getElementById('mode-2d');
+            const btn3d = document.getElementById('mode-3d');
+
+            if (mode === '2d') {
+                if (btn2d) btn2d.className = "flex-1 py-1.5 text-[11px] font-medium rounded-lg bg-white text-[#2c2c2c] shadow-sm transition cursor-pointer";
+                if (btn3d) btn3d.className = "flex-1 py-1.5 text-[11px] font-medium rounded-lg text-[#8c8275] hover:text-[#2c2c2c] transition cursor-pointer";
+            } else {
+                if (btn3d) btn3d.className = "flex-1 py-1.5 text-[11px] font-medium rounded-lg bg-white text-[#2c2c2c] shadow-sm transition cursor-pointer";
+                if (btn2d) btn2d.className = "flex-1 py-1.5 text-[11px] font-medium rounded-lg text-[#8c8275] hover:text-[#2c2c2c] transition cursor-pointer";
+            }
+            updateCanvas();
+        }
+
+        function openAuthModal() { document.getElementById('auth-modal').style.display = 'flex'; }
+        function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+        function openBirthInputModal() { document.getElementById('birth-modal').style.display = 'flex'; }
+        function closeBirthInputModal() { document.getElementById('birth-modal').style.display = 'none'; }
+
+        const SUPABASE_URL = "https://exupdqqluzwdumttlsxc.supabase.co";
+        const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_VTotIVs-m6IaHrtm9cegfw_A1RyQS-A";
+
+        let sbClient = null;
+        try {
+            if (window.supabase && window.supabase.createClient) {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+            }
+        } catch (e) {}
+
+        let currentUser = null;
+
+        function applyDirectBirth() {
+            const y = document.getElementById('direct-year').value;
+            const m = document.getElementById('direct-month').value;
+            const d = document.getElementById('direct-day').value;
+            userGender = document.getElementById('direct-gender').value;
+            const birthtime = document.getElementById('direct-birthtime').value;
+
+            processUserBirthData(y, m, d, birthtime);
+            setCategoryFilter('gem');
+            generateAutoBracelet(); 
+            closeBirthInputModal();
+        }
+
+        function processUserBirthData(year, monthNum, dayNum, birthhour) {
+            storedBirthData = { year, monthNum, dayNum, birthhour };
+            const month = parseInt(monthNum);
+            const day = parseInt(dayNum);
+
+            if ((month == 3 && day >= 21) || (month == 4 && day <= 19)) userZodiacKey = 'aries';
+            else if ((month == 4 && day >= 20) || (month == 5 && day <= 20)) userZodiacKey = 'taurus';
+            else if ((month == 5 && day >= 21) || (month == 6 && day <= 21)) userZodiacKey = 'gemini';
+            else if ((month == 6 && day >= 22) || (month == 7 && day <= 22)) userZodiacKey = 'cancer';
+            else if ((month == 7 && day >= 23) || (month == 8 && day <= 22)) userZodiacKey = 'leo';
+            else if ((month == 8 && day >= 23) || (month == 9 && day <= 22)) userZodiacKey = 'virgo';
+            else if ((month == 9 && day >= 23) || (month == 10 && day <= 23)) userZodiacKey = 'libra';
+            else if ((month == 10 && day >= 24) || (month == 11 && day <= 22)) userZodiacKey = 'scorpio';
+            else if ((month == 11 && day >= 23) || (month == 12 && day <= 21)) userZodiacKey = 'sagittarius';
+            else if ((month == 12 && day >= 22) || (month == 1 && day <= 19)) userZodiacKey = 'capricorn';
+            else if ((month == 1 && day >= 20) || (month == 2 && day <= 18)) userZodiacKey = 'aquarius';
+            else userZodiacKey = 'pisces';
+
+            let seasonObj = { zh: '', zh_cn: '', en: '', ru: '' };
+            let needElemStr = '';
+            
+            if (month >= 3 && month <= 5) {
+                seasonObj = { zh: '木旺 (Wood dominant)', zh_cn: '木旺 (Wood dominant)', en: 'Spring (Wood)', ru: 'Весна (Дерево)' };
+                userBaziElements = ['metal', 'fire'];
+            } else if (month >= 6 && month <= 8) {
+                seasonObj = { zh: '火旺 (Fire dominant)', zh_cn: '火旺 (Fire dominant)', en: 'Summer (Fire)', ru: 'Лето (Огонь)' };
+                userBaziElements = ['water', 'metal'];
+            } else if (month >= 9 && month <= 11) {
+                seasonObj = { zh: '金旺 (Metal dominant)', zh_cn: '金旺 (Metal dominant)', en: 'Autumn (Metal)', ru: 'Осень (Металл)' };
+                userBaziElements = ['wood', 'fire'];
+            } else {
+                seasonObj = { zh: '水旺 (Water dominant)', zh_cn: '水旺 (Water dominant)', en: 'Winter (Water)', ru: 'Зима (Вода)' };
+                userBaziElements = ['fire', 'wood', 'earth'];
+            }
+
+            let hourTipObj = { zh: '', zh_cn: '', en: '', ru: '' };
+            if (birthhour === 'unknown' || !birthhour) {
+                hourTipObj = { zh: '', zh_cn: '', en: '', ru: '' };
+            } else {
+                const hour = parseInt(birthhour);
+                if (hour >= 3 && hour <= 6) {
+                    hourTipObj = { zh: ' • 生於木時', zh_cn: ' • 生于木时', en: ' (Wood-rich Hour)', ru: ' (Час Дерева)' };
+                    userBaziElements = ['fire', 'earth'];
+                } else if (hour >= 9 && hour <= 13) {
+                    hourTipObj = { zh: ' • 生於火時', zh_cn: ' • 生于火时', en: ' (Fire-rich Hour)', ru: ' (Час Огня)' };
+                    userBaziElements = ['water', 'metal'];
+                } else if (hour >= 15 && hour <= 18) {
+                    hourTipObj = { zh: ' • 生於金時', zh_cn: ' • 生于金时', en: ' (Metal-rich Hour)', ru: ' (Час Металла)' };
+                    userBaziElements = ['fire', 'wood'];
+                } else if (hour >= 21 || hour <= 1) {
+                    hourTipObj = { zh: ' • 生於水時', zh_cn: ' • 生于水时', en: ' (Water-rich Hour)', ru: ' (Час Воды)' };
+                    userBaziElements = ['fire', 'earth', 'wood'];
+                }
+            }
+
+            const elemTextMap = {
+                zh: { fire: '金/火 (Metal/Fire)', wood: '木 (Wood)', metal: '金 (Metal)', water: '水 (Water)', earth: '土 (Earth)' },
+                zh_cn: { fire: '金/火 (Metal/Fire)', wood: '木 (Wood)', metal: '金 (Metal)', water: '水 (Water)', earth: '土 (Earth)' },
+                en: { fire: 'Metal/Fire', wood: 'Wood', metal: 'Metal', water: 'Water', earth: 'Earth' },
+                ru: { fire: 'Огонь', wood: 'Дерево', metal: 'Металл', water: 'Вода', earth: 'Земля' }
+            };
+
+            needElemStr = userBaziElements.map(e => elemTextMap[currentLang][e] || e).join(', ');
+
+            const zName = ZODIAC_NAMES[userZodiacKey][currentLang];
+            const seasonStr = seasonObj[currentLang];
+            const hourTip = hourTipObj[currentLang];
+            
+            let genderDescStr = '';
+            if (userGender === 'male') genderDescStr = currentLang === 'zh_cn' ? ' &nbsp;|&nbsp; 风格：男士型格' : ' &nbsp;|&nbsp; 風格：男士型格';
+            if (userGender === 'female') genderDescStr = currentLang === 'zh_cn' ? ' &nbsp;|&nbsp; 风格：女士温婉' : ' &nbsp;|&nbsp; 風格：女士溫婉';
+
+            const desc = document.getElementById('fortune-desc');
+            if (currentLang === 'zh') {
+                desc.innerHTML = `<span class="text-white font-medium">${year}.${month}.${day}</span> <br>
+                星座：${zName} &nbsp;|&nbsp; 八字：${seasonStr}${hourTip}${genderDescStr} <br>
+                <span class="text-[#c5a059] mt-1 inline-block">系統已為您優先推薦 <strong>${needElemStr}</strong> 屬性之高級水晶。</span>`;
+            } else if (currentLang === 'zh_cn') {
+                desc.innerHTML = `<span class="text-white font-medium">${year}.${month}.${day}</span> <br>
+                星座：${zName} &nbsp;|&nbsp; 八字：${seasonStr}${hourTip}${genderDescStr} <br>
+                <span class="text-[#c5a059] mt-1 inline-block">系统已为您优先推荐 <strong>${needElemStr}</strong> 属性之高级水晶。</span>`;
+            } else if (currentLang === 'en') {
+                desc.innerHTML = `<span class="text-white font-medium">${year}.${month}.${day}</span> <br>
+                Zodiac: ${zName} &nbsp;|&nbsp; Bazi: ${seasonStr}${hourTip} <br>
+                <span class="text-[#c5a059] mt-1 inline-block">Top crystals for <strong>${needElemStr}</strong> elements have been prioritized.</span>`;
+            } else {
+                desc.innerHTML = `<span class="text-white font-medium">${year}.${month}.${day}</span> <br>
+                Зодиак: ${zName} &nbsp;|&nbsp; Бацзы: ${seasonStr}${hourTip} <br>
+                <span class="text-[#c5a059] mt-1 inline-block">Рекомендуем кристаллы: <strong>${needElemStr}</strong>.</span>`;
+            }
+
+            renderList();
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            ['zh', 'zh_cn', 'en', 'ru'].forEach(l => {
+                const btn = document.getElementById(`lang-${l}`);
+                if (btn) {
+                    btn.className = l === lang ? 'lang-btn active' : 'lang-btn';
+                }
+            });
+            const t = TRANSLATIONS[lang];
+            document.getElementById('ui-subtitle').innerText = t.subtitle;
+            document.getElementById('ui-target-label').innerText = t.targetLabel;
+            document.getElementById('ui-string-label').innerText = t.stringLabel;
+            document.getElementById('btn-save').innerText = t.btnSave;
+            document.getElementById('btn-reset').innerText = t.btnReset;
+            document.getElementById('ui-tip').innerText = t.tip;
+            document.getElementById('ui-bead-title').innerText = t.beadTitle;
+            document.getElementById('ui-rank-tip').innerText = t.rankTip;
+            document.getElementById('ui-total-label').innerText = t.uiTotal;
+            document.getElementById('opt-14').innerText = t.opt14;
+            document.getElementById('opt-15').innerText = t.opt15;
+            document.getElementById('opt-16').innerText = t.opt16;
+            document.getElementById('opt-17').innerText = t.opt17;
+            document.getElementById('opt-18').innerText = t.opt18;
+
+            document.getElementById('lbl-energy-title').innerText = t.lblEnergyTitle;
+            document.getElementById('lbl-goal-title').innerText = t.lblGoalTitle;
+            document.getElementById('goal-all').innerText = t.btnGoalAll;
+            document.getElementById('goal-wealth').innerText = t.btnGoalWealth;
+            document.getElementById('goal-love').innerText = t.btnGoalLove;
+            document.getElementById('goal-protection').innerText = t.btnGoalProtection;
+            document.getElementById('goal-peace').innerText = t.btnGoalPeace;
+
+            document.getElementById('cat-gem').innerText = t.catGem;
+            document.getElementById('cat-accessory').innerText = t.catAcc;
+
+            document.getElementById('fortune-title').innerText = t.fortuneTitle;
+            document.getElementById('btn-edit-birth').innerText = t.editBirth;
+            document.getElementById('btn-auto-gen').innerText = t.btnAutoGen;
+            
+            document.getElementById('birth-modal-title').innerText = t.birthModalTitle;
+            document.getElementById('birth-modal-sub').innerText = t.birthModalSub;
+            document.getElementById('lbl-birthdate').innerText = t.lblBirthDate;
+            document.getElementById('lbl-gender').innerText = t.lblGender;
+            document.getElementById('opt-gender-none').innerText = t.optGenderNone;
+            document.getElementById('opt-gender-male').innerText = t.optGenderMale;
+            document.getElementById('opt-gender-female').innerText = t.optGenderFemale;
+            document.getElementById('lbl-birthtime').innerText = t.lblBirthTime;
+            document.getElementById('opt-time-unknown').innerText = t.optUnknown;
+            document.getElementById('btn-calc-submit').innerText = t.btnCalcSubmit;
+
+            document.getElementById('auth-modal-title').innerText = t.authModalTitle;
+            document.getElementById('auth-modal-sub').innerText = t.authModalSub;
+            document.getElementById('lbl-reg-birth').innerText = t.lblRegBirth;
+            document.getElementById('btn-login').innerText = t.btnLogin;
+            document.getElementById('btn-signup').innerText = t.btnSignUp;
+
+            const btn2d = document.getElementById('mode-2d');
+            const btn3d = document.getElementById('mode-3d');
+            if (btn2d) btn2d.innerText = t.mode2D;
+            if (btn3d) btn3d.innerText = t.mode3D;
+
+            if (storedBirthData) {
+                processUserBirthData(storedBirthData.year, storedBirthData.monthNum, storedBirthData.dayNum, storedBirthData.birthhour);
+            } else {
+                document.getElementById('fortune-desc').innerText = t.fortuneDefault;
+            }
+
+            updateUserUI();
+            
+            const config = EXCHANGE_RATES[currentLang] || EXCHANGE_RATES['zh'];
+            const langKey = (currentLang === 'zh_cn') ? 'zh_cn' : 'zh';
+
+            bracelet = bracelet.map(item => {
+                const beadObj = BEADS.find(b => b.id === item.beadId);
+                if (beadObj) {
+                    let baseRmb = 15;
+                    if (beadObj.category === 'accessory') {
+                        baseRmb = (beadObj.prices && (beadObj.prices[langKey] || beadObj.prices['zh'])) || 6;
+                    } else {
+                        const rank = beadObj.selectedRank || '3A';
+                        baseRmb = (beadObj.ranks && beadObj.ranks[rank] && (beadObj.ranks[rank][langKey]?.p10 || beadObj.ranks[rank]['zh']?.p10)) || 15;
+                    }
+                    return { ...item, price: baseRmb * config.rate };
+                }
+                return item;
+            });
+
+            renderList();
+            updateCanvas();
+        }
+
+        async function handleSignUp() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const y = document.getElementById('auth-year').value;
+            const m = document.getElementById('auth-month').value;
+            const d = document.getElementById('auth-day').value;
+            const birthtime = document.getElementById('auth-birthtime').value;
+
+            if(!email || !password) return alert(currentLang === 'zh_cn' ? '请填写完整登录资料' : '請填寫完整登入資料');
+            if (!sbClient) return alert(currentLang === 'zh_cn' ? '系统连线中，请稍后' : '系統連線中，請稍後');
+
+            const { data, error } = await sbClient.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: { birth_y: y, birth_m: m, birth_d: d, birthtime }
+                }
+            });
+
+            if (error) alert((currentLang === 'zh_cn' ? '注册失败：' : '註冊失敗：') + error.message);
+            else { 
+                alert(currentLang === 'zh_cn' ? '注册成功！欢迎加入 CARATZON。' : '註冊成功！歡迎加入 CARATZON。'); 
+                currentUser = data.user;
+                updateUserUI();
+                processUserBirthData(y, m, d, birthtime);
+                setCategoryFilter('gem');
+                generateAutoBracelet();
+                closeAuthModal(); 
+            }
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            if(!email || !password) return alert(currentLang === 'zh_cn' ? '请填写完整登录资料' : '請填寫完整登入資料');
+            if (!sbClient) return alert(currentLang === 'zh_cn' ? '系统连线中，请稍后' : '系統連線中，請稍後');
+            
+            const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) alert((currentLang === 'zh_cn' ? '登录失败：' : '登入失敗：') + error.message);
+            else { 
+                currentUser = data.user; 
+                updateUserUI(); 
+                if (currentUser.user_metadata && currentUser.user_metadata.birth_y) {
+                    const md = currentUser.user_metadata;
+                    processUserBirthData(md.birth_y, md.birth_m, md.birth_d, md.birthtime);
+                    setCategoryFilter('gem');
+                    generateAutoBracelet();
+                }
+                closeAuthModal(); 
+            }
+        }
+
+        async function handleLogout() {
+            if (sbClient) await sbClient.auth.signOut();
+            currentUser = null;
+            userZodiacKey = null;
+            userBaziElements = [];
+            storedBirthData = null;
+            document.getElementById('fortune-desc').innerText = TRANSLATIONS[currentLang].fortuneDefault;
+            updateUserUI();
+            renderList();
+        }
+
+        function updateUserUI() {
+            const displayEl = document.getElementById('user-display');
+            const displayElDesk = document.getElementById('user-display-desk');
+            const btnAuth = document.getElementById('btn-auth');
+            const t = TRANSLATIONS[currentLang];
+
+            if (currentUser) {
+                const nameStr = `Member: ${currentUser.email.split('@')[0]}`;
+                if (displayEl) displayEl.innerText = nameStr;
+                if (displayElDesk) displayElDesk.innerText = nameStr;
+                
+                if(currentLang === 'zh') btnAuth.innerText = '登出';
+                else if(currentLang === 'zh_cn') btnAuth.innerText = '登出';
+                else if(currentLang === 'en') btnAuth.innerText = 'Sign Out';
+                else btnAuth.innerText = 'Выход';
+                
+                btnAuth.onclick = handleLogout;
+            } else {
+                const guestStr = t.guestText || 'Guest';
+                if (displayEl) displayEl.innerText = guestStr;
+                if (displayElDesk) displayElDesk.innerText = guestStr;
+                
+                btnAuth.innerText = t.authBtn || '登入 / 註冊';
+                btnAuth.onclick = openAuthModal;
+            }
+        }
+
+        async function saveDesignToSupabase() {
+            if (!currentUser) { alert(currentLang === 'zh_cn' ? '请先登录会员以储存设计！' : '請先登入會員以儲存設計！'); openAuthModal(); return; }
+            if (bracelet.length === 0) { alert(currentLang === 'zh_cn' ? '请先于画布上挑选宝石！' : '請先於畫布上挑選寶石！'); return; }
+            const totalPrice = bracelet.reduce((sum, item) => sum + item.price, 0);
+            const { data, error } = await sbClient.from('Designs').insert([{ user_email: currentUser.email, bracelet_data: { beads: bracelet, stringColor: stringColor }, total_price: totalPrice }]);
+            if (error) alert((currentLang === 'zh_cn' ? '保存失败：' : '保存失敗：') + error.message);
+            else alert(currentLang === 'zh_cn' ? '您的专属设计已成功储存至云端！' : '您的專屬設計已成功儲存至雲端！');
+        }
+
+        async function checkSession() {
+            if (!sbClient) return;
+            try {
+                const { data } = await sbClient.auth.getSession();
+                if (data && data.session) { 
+                    currentUser = data.session.user; 
+                    updateUserUI(); 
+                    if (currentUser.user_metadata && currentUser.user_metadata.birth_y) {
+                        const md = currentUser.user_metadata;
+                        processUserBirthData(md.birth_y, md.birth_m, md.birth_d, md.birthtime);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function formatPrice(priceVal) {
+            return `${EXCHANGE_RATES[currentLang].prefix}${priceVal.toFixed(currentLang === 'en' ? 2 : 0)}`;
+        }
+
+        function updateStringColor(color) {
+            stringColor = color;
+            document.getElementById('string-color').value = color;
+            const stringEl = document.querySelector('.bracelet-string');
+            if (stringEl) stringEl.style.borderColor = stringColor;
+            if (currentViewMode === '3d') updateCanvas();
+        }
+
+        function changeBeadRank(beadId, rankKey) {
+            const bead = BEADS.find(b => b.id === beadId);
+            if (bead) { bead.selectedRank = rankKey; renderList(); }
+        }
+
+        function renderList() {
+            const container = document.getElementById('list-container');
+            const t = TRANSLATIONS[currentLang];
+            const langKey = (currentLang === 'zh_cn') ? 'zh_cn' : 'zh';
+            const config = EXCHANGE_RATES[currentLang] || EXCHANGE_RATES['zh'];
+
+            let filteredByCategory = BEADS.filter(b => b.category === activeCategoryFilter);
+
+            let sortedBeads = filteredByCategory.map(bead => {
+                let isZodiacMatch = userZodiacKey && bead.zodiac && bead.zodiac.includes(userZodiacKey);
+                let isBaziMatch = userBaziElements.length > 0 && userBaziElements.includes(bead.element);
+                let isGoalMatch = activeGoalFilter !== 'all' && bead.goals && bead.goals.includes(activeGoalFilter);
+                
+                let score = 0;
+                if (activeCategoryFilter === 'gem') {
+                    if (isGoalMatch) score += 5;
+                    if (isZodiacMatch && isBaziMatch) score += 3;
+                    else if (isZodiacMatch) score += 2;
+                    else if (isBaziMatch) score += 1;
+
+                    if (userGender === 'male' && bead.styleTag === 'male') score += 4;
+                    if (userGender === 'female' && bead.styleTag === 'female') score += 4;
+                }
+
+                return { ...bead, isZodiacMatch, isBaziMatch, isGoalMatch, score };
+            });
+
+            sortedBeads.sort((a, b) => b.score - a.score);
+
+            let htmlContent = '';
+            
+            sortedBeads.forEach(bead => {
+                let recBadge = '';
+                let cardClass = 'border border-[#e6dfd1] bg-white';
+
+                if (activeCategoryFilter === 'gem' && bead.score > 0) {
+                    if (bead.isGoalMatch) {
+                        recBadge = `<span class="text-[9px] bg-[#f4f1ea] text-[#665c52] border border-[#e6dfd1] px-2 py-0.5 rounded-full font-medium shadow-sm tracking-wide">${t.badgeGoal}</span>`;
+                        cardClass = 'match-card-goal';
+                    } else if (bead.score >= 3) {
+                        recBadge = `<span class="text-[9px] bg-[#2c2c2c] text-[#c5a059] border border-[#2c2c2c] px-2 py-0.5 rounded-full font-medium shadow-sm tracking-wide animate-pulse">${t.badgeDouble}</span>`;
+                        cardClass = 'match-card-double';
+                    } else if (bead.score === 2) {
+                        recBadge = `<span class="text-[9px] bg-[#595045] text-white px-2 py-0.5 rounded-full font-light shadow-sm tracking-wide">${t.badgeZodiac}</span>`;
+                        cardClass = 'match-card-zodiac';
+                    } else if (bead.score === 1) {
+                        recBadge = `<span class="text-[9px] bg-[#8c8275] text-white px-2 py-0.5 rounded-full font-light shadow-sm tracking-wide">${t.badgeBazi}</span>`;
+                        cardClass = 'match-card-bazi';
+                    }
+                }
+
+                const beadName = (bead.name && bead.name[currentLang]) || (bead.name && bead.name['en']) || 'Gemstone';
+                const beadBenefit = (bead.benefit && bead.benefit[currentLang]) || (bead.benefit && bead.benefit['en']) || '';
+                const elementName = (bead.elementName && bead.elementName[currentLang]) || (bead.elementName && bead.elementName['en']) || '';
+                
+                let rankButtons = '';
+                let actionButtons = '';
+                
+                const imgStyle = bead.category === 'accessory' ? `transform: scale(${bead.scale || 1.8});` : '';
+                const imgClass = bead.category === 'accessory' ? '' : 'gem-img';
+
+                if (bead.category === 'gem') {
+                    const currentRank = bead.selectedRank || '3A';
+                    const rankObj = (bead.ranks && bead.ranks[currentRank] && (bead.ranks[currentRank][langKey] || bead.ranks[currentRank]['zh'])) || { p8: 10, p10: 15, p12: 20 };
+                    
+                    const p8Final = (rankObj.p8 || 10) * config.rate;
+                    const p10Final = (rankObj.p10 || 15) * config.rate;
+                    const p12Final = (rankObj.p12 || 20) * config.rate;
+
+                    if (bead.ranks) {
+                        Object.keys(bead.ranks).forEach(rankKey => {
+                            const isSelected = rankKey === currentRank;
+                            const btnClass = isSelected ? 'bg-[#2c2c2c] text-white font-medium shadow-sm' : 'bg-[#faf9f6] text-[#8c8275] hover:bg-[#f0ebe1]';
+                            rankButtons += `<button onclick="changeBeadRank('${bead.id}', '${rankKey}')" class="text-[10px] px-3 py-1 rounded-md transition-all tracking-wide ${btnClass}">${rankKey}</button>`;
+                        });
+                    }
+
+                    actionButtons = `
+                        <div class="grid grid-cols-3 gap-1.5 mt-3 border-t border-[#f0ebe1] pt-3">
+                            <div onclick="addItem('${bead.img}', 8, ${p8Final}, '${bead.id}')" class="text-[11px] py-1.5 bg-white border border-[#e6dfd1] rounded-lg text-center cursor-pointer hover:bg-[#faf9f6] hover:border-[#c5a059] font-light text-[#665c52] transition-all flex flex-col shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+                                <span>8mm</span>
+                                <span class="text-[9px] text-[#8c8275] font-light">${formatPrice(p8Final)}</span>
+                            </div>
+                            <div onclick="addItem('${bead.img}', 10, ${p10Final}, '${bead.id}')" class="text-[11px] py-1.5 bg-white border border-[#e6dfd1] rounded-lg text-center cursor-pointer hover:bg-[#faf9f6] hover:border-[#c5a059] font-medium text-[#2c2c2c] transition-all flex flex-col shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+                                <span>10mm</span>
+                                <span class="text-[9px] text-[#8c8275] font-light">${formatPrice(p10Final)}</span>
+                            </div>
+                            <div onclick="addItem('${bead.img}', 12, ${p12Final}, '${bead.id}')" class="text-[11px] py-1.5 bg-white border border-[#e6dfd1] rounded-lg text-center cursor-pointer hover:bg-[#faf9f6] hover:border-[#c5a059] font-medium text-[#2c2c2c] transition-all flex flex-col shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+                                <span>12mm</span>
+                                <span class="text-[9px] text-[#8c8275] font-light">${formatPrice(p12Final)}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const accBase = (bead.prices && (bead.prices[langKey] || bead.prices['zh'])) || 8;
+                    const accFinal = accBase * config.rate;
+                    actionButtons = `
+                        <div class="mt-3 border-t border-[#f0ebe1] pt-3">
+                            <div onclick="addItem('${bead.img}', ${bead.size || 10}, ${accFinal}, '${bead.id}')" class="w-full text-[12px] py-2 bg-[#2c2c2c] border border-[#2c2c2c] rounded-lg text-center cursor-pointer hover:bg-[#c5a059] font-medium text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.08)]">
+                                <span>${t.btnAddAcc}</span>
+                                <span class="text-[10px] text-[#e6dfd1] font-light bg-[#3a3530] px-2 py-0.5 rounded-md">${formatPrice(accFinal)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                htmlContent += `
+                    <div class="p-4 ${cardClass} rounded-[1.25rem] shadow-sm flex flex-col justify-between hover:shadow-[0_8px_25px_rgba(197,160,89,0.08)] transition-all duration-300 relative group">
+                        <div>
+                            <div class="flex justify-between items-center mb-3 min-h-[20px]">
+                                ${recBadge}
+                                <span class="text-[9px] text-[#8c8275] ml-auto font-light tracking-widest uppercase">${elementName}</span>
+                            </div>
+                            <div class="w-16 h-16 mx-auto mb-3 bead-img-box shadow-[0_4px_12px_rgba(0,0,0,0.06)] group-hover:scale-105 transition-transform duration-500">
+                                <img src="${bead.img}" class="${imgClass}" style="${imgStyle}">
+                            </div>
+                            <p class="text-[13px] text-center font-medium text-[#2c2c2c] truncate tracking-wide">${beadName}</p>
+                            
+                            <p class="text-[10px] text-center text-[#665c52] mt-2 font-light leading-relaxed min-h-[32px] flex items-center justify-center">
+                                ${beadBenefit}
+                            </p>
+
+                            <div class="flex justify-center gap-1.5 mt-3 mb-2 min-h-[24px]">${rankButtons}</div>
+                        </div>
+
+                        ${actionButtons}
+                    </div>
+                `;
+            });
+            container.innerHTML = htmlContent;
+        }
+
+        function addItem(img, size, price, beadId) {
+            bracelet.push({ id: Date.now() + Math.random(), img, size, price, beadId });
+            updateCanvas();
+        }
+
+        function removeItem(id) { bracelet = bracelet.filter(item => item.id !== id); updateCanvas(); }
+        function clearBracelet() { bracelet = []; updateCanvas(); }
+
+        function updateCanvas() {
+            const t = TRANSLATIONS[currentLang];
+            const totalCount = bracelet.length;
+            const totalLength = bracelet.reduce((sum, item) => sum + item.size, 0);
+            const totalPrice = bracelet.reduce((sum, item) => sum + item.price, 0);
+            
+            const targetWrist = parseInt(document.getElementById('target-wrist').value) || 150;
+            const targetTotalMm = targetWrist + 25; 
+            const statusEl = document.getElementById('wrist-status');
+
+            if (totalLength === 0) {
+                statusEl.innerText = t.statusStart;
+                statusEl.className = 'text-[10px] font-light text-[#8c8275] bg-[#faf9f6] px-3 py-1.5 rounded-md border border-[#e6dfd1] tracking-wide';
+                document.getElementById('energy-breakdown-box').classList.add('hidden');
+                document.getElementById('energy-breakdown-box').classList.remove('opacity-100');
+            } else if (totalLength < targetTotalMm - 6) {
+                const lastAddedSize = bracelet[bracelet.length - 1].size || 10;
+                const needNum = Math.round((targetTotalMm - totalLength) / lastAddedSize) || 1;
+                
+                statusEl.innerText = t.statusNeedMore.replace('{n}', needNum).replace('{s}', lastAddedSize);
+                statusEl.className = 'text-[10px] font-medium tracking-wide text-[#b45309] bg-[#fffbeb] px-2.5 py-1.5 rounded-md border border-[#fde68a]';
+            } else if (totalLength > targetTotalMm + 6) {
+                statusEl.innerText = t.statusTooLong;
+                statusEl.className = 'text-[10px] font-medium tracking-wide text-rose-600 bg-rose-50/80 px-2.5 py-1.5 rounded-md border border-rose-100';
+            } else {
+                statusEl.innerText = t.statusPerfect;
+                statusEl.className = 'text-[10px] font-medium tracking-wide text-emerald-600 bg-emerald-50/80 px-2.5 py-1.5 rounded-md border border-emerald-100';
+            }
+
+            if (totalCount > 0) {
+                document.getElementById('energy-breakdown-box').classList.remove('hidden');
+                setTimeout(() => document.getElementById('energy-breakdown-box').classList.add('opacity-100'), 10);
+                
+                let goalCounts = { wealth: 0, love: 0, protection: 0, peace: 0 };
+                let totalGoalsCount = 0;
+
+                bracelet.forEach(item => {
+                    const beadObj = BEADS.find(b => b.id === item.beadId);
+                    if (beadObj && beadObj.goals) {
+                        beadObj.goals.forEach(g => {
+                            goalCounts[g] = (goalCounts[g] || 0) + 1;
+                            totalGoalsCount++;
+                        });
+                    }
+                });
+
+                const goalNames = {
+                    wealth: { zh: '招財', zh_cn: '招财', en: 'Wealth', ru: 'Удача' },
+                    love: { zh: '人緣', zh_cn: '人缘', en: 'Love', ru: 'Любовь' },
+                    protection: { zh: '護身', zh_cn: '护身', en: 'Protection', ru: 'Защита' },
+                    peace: { zh: '靜心', zh_cn: '静心', en: 'Peace', ru: 'Мир' }
+                };
+
+                let barsHtml = '';
+                Object.keys(goalCounts).forEach(gKey => {
+                    if (goalCounts[gKey] > 0 && totalGoalsCount > 0) {
+                        const pct = Math.round((goalCounts[gKey] / totalGoalsCount) * 100);
+                        const label = goalNames[gKey][currentLang];
+                        barsHtml += `<span class="bg-[#faf9f6] text-[#595045] px-3 py-1 rounded-full border border-[#e6dfd1] font-light tracking-wide">${label} <span class="font-medium text-[#2c2c2c] ml-1">${pct}%</span></span>`;
+                    }
+                });
+                document.getElementById('energy-bars').innerHTML = barsHtml || '<span class="text-[#8c8275] font-light">綜合能量</span>';
+            }
+
+            document.getElementById('total-info').innerText = `${totalCount} ${t.beadUnit} | ${totalLength} mm`;
+            document.getElementById('total-price').innerText = formatPrice(totalPrice);
+
+            const containerWrapper = document.getElementById('canvas-wrapper');
+            
+            if (currentViewMode === '3d') {
+                // 3D 佩戴模擬模式
+                containerWrapper.innerHTML = `
+                    <div class="preview-3d-stage" id="stage-3d">
+                        <div class="wrist-model-bg"></div>
+                        <div id="orbit-3d-container" style="position: absolute; width: 100%; height: 100%; pointer-events: none;"></div>
+                    </div>
+                    <p class="text-[10px] text-[#8c8275] text-center mt-2 tracking-wide">💡 左右滑動手指或拖曳滑鼠即可 360 度立體旋轉手鍊</p>
+                `;
+
+                const stage3d = document.getElementById('stage-3d');
+                const orbitContainer = document.getElementById('orbit-3d-container');
+                const stageWidth = stage3d.clientWidth || 300;
+                const stageCenter = stageWidth / 2;
+                
+                const rx = 105; 
+                const ry = 38; 
+
+                function render3DOrbit() {
+                    if (!orbitContainer) return;
+                    orbitContainer.innerHTML = '';
+
+                    const count = bracelet.length;
+                    if (count === 0) return;
+
+                    let renderList3D = bracelet.map((item, index) => {
+                        const angle = (index / count) * 2 * Math.PI + rotationAngle3D;
+                        const x = stageCenter + rx * Math.cos(angle);
+                        const y = stageCenter + ry * Math.sin(angle) + 8;
+                        const depth = Math.sin(angle); 
+
+                        const scale = 0.78 + (depth + 1) * 0.22; 
+                        const opacity = 0.6 + (depth + 1) * 0.2; 
+                        const zIndex = depth > 0 ? 10 : 1; 
+
+                        return { item, x, y, scale, opacity, zIndex };
+                    });
+
+                    renderList3D.sort((a, b) => a.zIndex - b.zIndex);
+
+                    renderList3D.forEach(node => {
+                        const pxSize = node.item.size * 3.4 * node.scale;
+                        const beadObj = BEADS.find(b => b.id === node.item.beadId);
+                        const imgStyle = (beadObj && beadObj.category === 'accessory') ? `transform: scale(${beadObj.scale || 1.8});` : '';
+                        const imgClass = (beadObj && beadObj.category === 'accessory') ? '' : 'gem-img';
+
+                        const el = document.createElement('div');
+                        el.className = 'bead-3d-node';
+                        el.style.left = `${node.x}px`;
+                        el.style.top = `${node.y}px`;
+                        el.style.width = `${pxSize}px`;
+                        el.style.height = `${pxSize}px`;
+                        el.style.opacity = node.opacity;
+                        el.style.zIndex = node.zIndex;
+
+                        el.innerHTML = `
+                            <div class="bead-img-box">
+                                <img src="${node.item.img}" class="${imgClass}" style="${imgStyle}">
+                            </div>
+                        `;
+                        orbitContainer.appendChild(el);
+                    });
+                }
+
+                render3DOrbit();
+
+                let isDragging3D = false;
+                let startX3D = 0;
+
+                const handleStart = (clientX) => { isDragging3D = true; startX3D = clientX; };
+                const handleMove = (clientX) => {
+                    if (!isDragging3D) return;
+                    let dx = clientX - startX3D;
+                    rotationAngle3D += dx * 0.02;
+                    startX3D = clientX;
+                    render3DOrbit();
+                };
+                const handleEnd = () => { isDragging3D = false; };
+
+                stage3d.onmousedown = (e) => handleStart(e.clientX);
+                window.onmousemove = (e) => handleMove(e.clientX);
+                window.onmouseup = handleEnd;
+
+                stage3d.ontouchstart = (e) => handleStart(e.touches[0].clientX);
+                stage3d.ontouchmove = (e) => handleMove(e.touches[0].clientX);
+                window.ontouchend = handleEnd;
+
+            } else {
+                // 2D 編輯排版模式
+                containerWrapper.innerHTML = `<div class="canvas-container" id="canvas"></div>`;
+                const canvas = document.getElementById('canvas');
+                
+                const canvasWidth = canvas.clientWidth || canvas.offsetWidth || 340;
+                const canvasCenter = canvasWidth / 2;
+                
+                // 核心修復：使用最佳半徑（110px ~ 125px），珠子粒粒飽滿清晰，絕不密集擠壓！
+                const radius = Math.min(125, Math.max(105, canvasCenter - 45));
+                const stringDiameter = radius * 2; 
+                
+                let canvasHTML = '';
+                if (bracelet.length > 0) {
+                    canvasHTML += `<div class="bracelet-string" style="width: ${stringDiameter}px; height: ${stringDiameter}px; border-color: ${stringColor};"></div>`;
+                } else {
+                    canvasHTML = '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#a39888] text-[10px] font-light text-center pointer-events-none z-0 tracking-[0.3em] uppercase leading-loose">CARATZON<br>Bespoke</div>';
+                }
+                canvas.innerHTML = canvasHTML;
+                
+                bracelet.forEach((item, index) => {
+                    const angle = (index / bracelet.length) * 2 * Math.PI - Math.PI / 2;
+                    const x = canvasCenter + radius * Math.cos(angle); 
+                    const y = canvasCenter + radius * Math.sin(angle); 
+                    const pxSize = item.size * 3.4; 
+                    
+                    const beadObj = BEADS.find(b => b.id === item.beadId);
+                    const imgStyle = (beadObj && beadObj.category === 'accessory') ? `transform: scale(${beadObj.scale || 1.8});` : '';
+                    const imgClass = (beadObj && beadObj.category === 'accessory') ? '' : 'gem-img';
+                    
+                    const el = document.createElement('div');
+                    el.className = 'item-node';
+                    el.style.left = x + 'px';
+                    el.style.top = y + 'px';
+                    el.style.width = pxSize + 'px';
+                    el.style.height = pxSize + 'px';
+                    
+                    el.innerHTML = `
+                        <div class="del-badge" onclick="event.stopPropagation(); removeItem(${item.id});">✕</div>
+                        <div class="bead-img-box pointer-events-none">
+                            <img src="${item.img}" class="${imgClass}" style="${imgStyle}">
+                        </div>
+                    `;
+
+                    let isDragging = false;
+                    let startClientX = 0, startClientY = 0;
+                    let initialLeft = x, initialTop = y;
+
+                    const dragStart = (e) => {
+                        isDragging = false;
+                        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                        
+                        startClientX = clientX;
+                        startClientY = clientY;
+                        initialLeft = parseFloat(el.style.left);
+                        initialTop = parseFloat(el.style.top);
+
+                        document.addEventListener('mousemove', dragMove);
+                        document.addEventListener('mouseup', dragEnd);
+                        document.addEventListener('touchmove', dragMove, { passive: false });
+                        document.addEventListener('touchend', dragEnd);
+                    };
+
+                    const dragMove = (e) => {
+                        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                        const dx = clientX - startClientX;
+                        const dy = clientY - startClientY;
+
+                        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                            if (!isDragging) {
+                                isDragging = true;
+                                el.classList.add('dragging');
+                            }
+                            if (e.cancelable) e.preventDefault();
+                            el.style.left = (initialLeft + dx) + 'px';
+                            el.style.top = (initialTop + dy) + 'px';
+                        }
+                    };
+
+                    const dragEnd = () => {
+                        document.removeEventListener('mousemove', dragMove);
+                        document.removeEventListener('mouseup', dragEnd);
+                        document.removeEventListener('touchmove', dragMove);
+                        document.removeEventListener('touchend', dragEnd);
+
+                        if (isDragging) {
+                            el.classList.remove('dragging');
+                            
+                            const currentLeft = parseFloat(el.style.left);
+                            const currentTop = parseFloat(el.style.top);
+                            const dropAngle = Math.atan2(currentTop - canvasCenter, currentLeft - canvasCenter);
+                            
+                            const N = bracelet.length;
+                            const normalizedAngle = (dropAngle + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+                            const targetIndex = Math.round(normalizedAngle / ((2 * Math.PI) / N)) % N;
+                            const currentIndex = bracelet.findIndex(b => b.id === item.id);
+
+                            if (currentIndex !== -1 && currentIndex !== targetIndex) {
+                                const [movedItem] = bracelet.splice(currentIndex, 1);
+                                bracelet.splice(targetIndex, 0, movedItem);
+                            }
+                            updateCanvas();
+                        }
+                    };
+
+                    el.addEventListener('mousedown', dragStart);
+                    el.addEventListener('touchstart', dragStart, { passive: false });
+                    canvas.appendChild(el);
+                });
+            }
+        }
+
+        initDateDropdowns();
+        renderList();
+        checkSession();
+    </script>
+</body>
+</html>
